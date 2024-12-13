@@ -240,4 +240,9 @@ footer {
     padding: 1rem;
     text-align: center;
     color: #7f8c8d;
+    font-size: 0.8rem;
+}
+
+#version {
+    opacity: 0.7;
 }

@@ -1,10 +1,8 @@
 class BPMDetector {
     constructor() {
-        this.audioContext = null;
-        this.stream = null;
+        this.audioProcessor = new AudioProcessor();
         this.isListening = false;
         this.fixedBPM = 120;
-        this.audioProcessor = null;
         this.beatTimes = [];
         this.lastBeatTime = 0;
         this.currentPattern = 'custom';
@@ -38,6 +36,7 @@ class BPMDetector {
         this.playRhythmButton = document.getElementById('playRhythm');
         this.tapTempoButton = document.getElementById('tapTempo');
         this.tapBpmDisplay = document.getElementById('tapBpmDisplay');
+        this.versionDisplay = document.getElementById('version');
 
         // Pattern buttons
         this.patternButtons = {
@@ -54,6 +53,21 @@ class BPMDetector {
         this.bpmDisplay.textContent = `Detected BPM: ${this.fixedBPM}`;
         this.tapBpmDisplay.textContent = `Tapped BPM: ${this.fixedBPM}`;
         this.playRhythmButton.disabled = false;
+        
+        // Set version
+        if (this.versionDisplay) {
+            this.versionDisplay.textContent = 'v1.0.1';
+        }
+
+        // Set up audio processor callbacks
+        this.audioProcessor.setCallbacks(
+            () => this.beatDetected(),
+            (data) => this.drawWaveform(data),
+            (energy) => {
+                this.updateEnergyHistory(energy);
+                this.updateEnergyMeter(energy);
+            }
+        );
 
         // Bind event listeners
         this.startButton.addEventListener('click', () => this.toggleListening());
@@ -118,99 +132,65 @@ class BPMDetector {
         });
     }
 
-    async initAudio() {
-        try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const source = this.audioContext.createMediaStreamSource(this.stream);
-            
-            // Create analyzer node with better settings for visualization
-            const analyser = this.audioContext.createAnalyser();
-            analyser.fftSize = 2048; // Better resolution for visualization
-            analyser.smoothingTimeConstant = 0.8; // Smoother visualization
-            
-            // Connect source directly to analyser for visualization
-            source.connect(analyser);
-            
-            // Create bandpass filter for beat detection
-            const filter = this.audioContext.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.value = 100;
-            filter.Q.value = 1.0;
-            
-            // Create second analyzer for beat detection
-            const beatAnalyser = this.audioContext.createAnalyser();
-            beatAnalyser.fftSize = 2048;
-            beatAnalyser.smoothingTimeConstant = 0.4;
-            
-            // Connect source to filter then to beat analyzer
-            source.connect(filter);
-            filter.connect(beatAnalyser);
-            
-            // Process audio for visualization and beat detection
-            this.processAudio(analyser, beatAnalyser);
-        } catch (error) {
-            console.error('Error accessing microphone:', error);
-            alert('Error accessing microphone. Please ensure microphone permissions are granted.');
+    async toggleListening() {
+        if (!this.isListening) {
+            const success = await this.audioProcessor.startListening();
+            if (success) {
+                this.isListening = true;
+                this.startButton.textContent = 'Stop Listening';
+                this.startButton.classList.add('listening');
+                this.fixedBPM = null;
+                this.beatTimes = [];
+            }
+        } else {
+            this.audioProcessor.stopListening();
+            this.isListening = false;
+            this.startButton.textContent = 'Start Listening';
+            this.startButton.classList.remove('listening');
         }
     }
 
-    processAudio(visualAnalyser, beatAnalyser) {
-        const visualBufferLength = visualAnalyser.frequencyBinCount;
-        const beatBufferLength = beatAnalyser.frequencyBinCount;
-        const visualDataArray = new Uint8Array(visualBufferLength);
-        const beatDataArray = new Uint8Array(beatBufferLength);
-        const energyThreshold = 1.5;
-        let lastEnergy = 0;
-        let energyHistory = [];
-        const historyLength = 10;
+    beatDetected() {
+        const now = Date.now();
+        this.beatTimes.push(now);
 
-        const analyze = () => {
-            if (!this.isListening) return;
+        // Храним только последние 8 ударов для более точного расчета
+        if (this.beatTimes.length > 8) {
+            this.beatTimes.shift();
+        }
 
-            // Get data for visualization
-            visualAnalyser.getByteTimeDomainData(visualDataArray);
-            
-            // Get data for beat detection
-            beatAnalyser.getByteTimeDomainData(beatDataArray);
-            
-            // Calculate RMS energy from beat analyzer
-            let energy = 0;
-            for (let i = 0; i < beatBufferLength; i++) {
-                const amplitude = (beatDataArray[i] - 128) / 128;
-                energy += amplitude * amplitude;
-            }
-            energy = Math.sqrt(energy / beatBufferLength);
+        this.calculateBPM();
+    }
 
-            // Update energy history
-            energyHistory.push(energy);
-            if (energyHistory.length > historyLength) {
-                energyHistory.shift();
-            }
+    calculateBPM() {
+        if (this.beatTimes.length < 4) return; // Нужно минимум 4 удара для точного расчета
 
-            // Calculate average energy
-            const averageEnergy = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
+        const intervals = [];
+        for (let i = 1; i < this.beatTimes.length; i++) {
+            intervals.push(this.beatTimes[i] - this.beatTimes[i - 1]);
+        }
 
-            // Detect beat
-            if (energy > averageEnergy * energyThreshold && 
-                energy > lastEnergy && 
-                Date.now() - this.lastBeatTime > 200) {
-                
-                this.beatDetected();
-                this.lastBeatTime = Date.now();
-            }
+        // Удаляем выбросы (интервалы, сильно отличающиеся от среднего)
+        const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+        const filteredIntervals = intervals.filter(interval => 
+            Math.abs(interval - avgInterval) < avgInterval * 0.5
+        );
 
-            lastEnergy = energy;
+        if (filteredIntervals.length < 2) return;
 
-            // Update visualizations
-            if (this.waveCtx) this.drawWaveform(visualDataArray);
-            if (this.energyCtx) this.updateEnergyHistory(energy);
-            if (this.energyBar && this.energyValue) this.updateEnergyMeter(energy);
+        const cleanAvgInterval = filteredIntervals.reduce((a, b) => a + b) / filteredIntervals.length;
+        let bpm = Math.round(60000 / cleanAvgInterval);
 
-            requestAnimationFrame(analyze);
-        };
+        // Корректируем BPM в разумных пределах
+        if (bpm < 60) bpm *= 2;
+        if (bpm > 200) bpm = Math.round(bpm / 2);
 
-        analyze();
+        // Проверяем, что BPM в разумных пределах
+        if (bpm >= 40 && bpm <= 220) {
+            this.bpmDisplay.textContent = `Detected BPM: ${bpm}`;
+            this.fixedBPM = bpm;
+            this.fixBpmButton.disabled = false;
+        }
     }
 
     drawWaveform(dataArray) {
@@ -332,66 +312,6 @@ class BPMDetector {
             this.energyBar.style.backgroundColor = '#FFC107'; // Yellow
         } else {
             this.energyBar.style.backgroundColor = '#4CAF50'; // Green
-        }
-    }
-
-    beatDetected() {
-        const now = Date.now();
-        this.beatTimes.push(now);
-
-        // Храним только последние 8 ударов для более точного расчета
-        if (this.beatTimes.length > 8) {
-            this.beatTimes.shift();
-        }
-
-        this.calculateBPM();
-    }
-
-    calculateBPM() {
-        if (this.beatTimes.length < 4) return; // Нужно минимум 4 удара для точного расчета
-
-        const intervals = [];
-        for (let i = 1; i < this.beatTimes.length; i++) {
-            intervals.push(this.beatTimes[i] - this.beatTimes[i - 1]);
-        }
-
-        // Удаляем выбросы (интервалы, сильно отличающиеся от среднего)
-        const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
-        const filteredIntervals = intervals.filter(interval => 
-            Math.abs(interval - avgInterval) < avgInterval * 0.5
-        );
-
-        if (filteredIntervals.length < 2) return;
-
-        const cleanAvgInterval = filteredIntervals.reduce((a, b) => a + b) / filteredIntervals.length;
-        let bpm = Math.round(60000 / cleanAvgInterval);
-
-        // Корректируем BPM в разумных пределах
-        if (bpm < 60) bpm *= 2;
-        if (bpm > 200) bpm = Math.round(bpm / 2);
-
-        // Проверяем, что BPM в разумных пределах
-        if (bpm >= 40 && bpm <= 220) {
-            this.bpmDisplay.textContent = `Detected BPM: ${bpm}`;
-            this.fixedBPM = bpm;
-            this.fixBpmButton.disabled = false;
-        }
-    }
-
-    async toggleListening() {
-        if (!this.isListening) {
-            if (!this.audioContext) {
-                await this.initAudio();
-            }
-            this.isListening = true;
-            this.startButton.textContent = 'Stop Listening';
-            this.startButton.classList.add('listening');
-            this.fixedBPM = null;
-            this.beatTimes = [];
-        } else {
-            this.isListening = false;
-            this.startButton.textContent = 'Start Listening';
-            this.startButton.classList.remove('listening');
         }
     }
 
