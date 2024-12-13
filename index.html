@@ -5,72 +5,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guitar BPM Detector</title>
     <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <h1>Guitar BPM Detector</h1>
-        
-        <div class="main-controls">
-            <div class="visualization-container">
-                <canvas id="audioVisualizerWave" width="100" height="15"></canvas>
-                <canvas id="audioVisualizerEnergy" width="100" height="10"></canvas>
-                <div id="energyMeter">
-                    <div id="energyBar"></div>
-                    <span id="energyValue">Energy: 0</span>
+        <div class="poly-panel main-panel">
+            <h1>Guitar BPM Detector</h1>
+            
+            <div class="main-controls poly-panel">
+                <div class="visualization-container">
+                    <div class="canvas-wrapper">
+                        <canvas id="audioVisualizerWave" width="100" height="15"></canvas>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="audioVisualizerEnergy" width="100" height="10"></canvas>
+                    </div>
+                    <div id="energyMeter" class="energy-meter">
+                        <div id="energyBar"></div>
+                        <span id="energyValue">Energy: 0</span>
+                    </div>
                 </div>
-            </div>
-            <button id="startListening" class="btn">Start Listening</button>
-            <div id="bpmDisplay">Detected BPM: 90</div>
-            <button id="fixBpm" class="btn" disabled>Fix BPM</button>
-            <div class="bpm-controls">
-                <input type="number" id="manualBpm" min="30" max="300" value="90" class="bpm-input">
-                <button id="tapBpm" class="btn">Tap BPM</button>
-            </div>
-        </div>
+                
+                <div class="control-group">
+                    <button id="startListening" class="btn poly-btn">Start Listening</button>
+                    <div id="bpmDisplay" class="bpm-display">Detected BPM: 90</div>
+                    <button id="fixBpm" class="btn poly-btn" disabled>Fix BPM</button>
+                </div>
 
-        <div class="rhythm-controls">
-            <button id="playRhythm" class="btn">Play Rhythm</button>
-            <div class="pattern-buttons">
-                <button id="pattern-basic" class="btn pattern-btn" title="Базовый ритм 4/4">Простой ритм</button>
-                <button id="pattern-march" class="btn pattern-btn" title="Простой маршевый ритм">Марш</button>
-                <button id="pattern-pop" class="btn pattern-btn" title="Простой поп-ритм">Поп-ритм</button>
-                <button id="pattern-rock" class="btn pattern-btn" title="Базовый рок-ритм">Рок-ритм</button>
-                <button id="pattern-dance" class="btn pattern-btn" title="Простой танцевальный ритм">Танцевальный</button>
-                <button id="pattern-random" class="btn pattern-btn" title="Сгенерировать случайный ритм">Случайный ритм</button>
-                <button id="pattern-custom" class="btn pattern-btn active">Свой ритм</button>
+                <div class="bpm-controls">
+                    <input type="number" id="manualBpm" min="30" max="300" value="90" class="bpm-input poly-input">
+                    <button id="tapBpm" class="btn poly-btn">Tap BPM</button>
+                </div>
             </div>
-        </div>
 
-        <div class="pattern-editor">
-            <div class="pattern-info">
-                <span class="pattern-name">Текущий ритм: <span id="currentPatternName">Свой ритм</span></span>
-                <span class="pattern-description" id="patternDescription">Создайте свой ритм</span>
-            </div>
-            <div class="instrument-row">
-                <span class="instrument-label">Бас</span>
-                <div id="kickGrid" class="grid">
-                    <!-- 16 buttons will be added here -->
+            <div class="rhythm-controls poly-panel">
+                <button id="playRhythm" class="btn poly-btn primary">Play Rhythm</button>
+                <div class="pattern-buttons">
+                    <button id="pattern-basic" class="btn pattern-btn poly-btn" title="Базовый ритм 4/4">Простой ритм</button>
+                    <button id="pattern-march" class="btn pattern-btn poly-btn" title="Простой маршевый ритм">Марш</button>
+                    <button id="pattern-pop" class="btn pattern-btn poly-btn" title="Простой поп-ритм">Поп-ритм</button>
+                    <button id="pattern-rock" class="btn pattern-btn poly-btn" title="Базовый рок-ритм">Рок-ритм</button>
+                    <button id="pattern-dance" class="btn pattern-btn poly-btn" title="Простой танцевальный ритм">Танцевальный</button>
+                    <button id="pattern-random" class="btn pattern-btn poly-btn" title="Сгенерировать случайный ритм">Случайный ритм</button>
+                    <button id="pattern-custom" class="btn pattern-btn poly-btn active">Свой ритм</button>
                 </div>
             </div>
-            <div class="instrument-row">
-                <span class="instrument-label">Средние</span>
-                <div id="snareGrid" class="grid">
-                    <!-- 16 buttons will be added here -->
+
+            <div class="pattern-editor poly-panel">
+                <div class="pattern-info">
+                    <span class="pattern-name">Текущий ритм: <span id="currentPatternName">Свой ритм</span></span>
+                    <span class="pattern-description" id="patternDescription">Создайте свой ритм</span>
                 </div>
-            </div>
-            <div class="instrument-row">
-                <span class="instrument-label">Высокие</span>
-                <div id="hihatGrid" class="grid">
-                    <!-- 16 buttons will be added here -->
+                <div class="grid-container">
+                    <div class="instrument-row">
+                        <span class="instrument-label">Бас</span>
+                        <div id="kickGrid" class="grid">
+                            <!-- 16 buttons will be added here -->
+                        </div>
+                    </div>
+                    <div class="instrument-row">
+                        <span class="instrument-label">Средние</span>
+                        <div id="snareGrid" class="grid">
+                            <!-- 16 buttons will be added here -->
+                        </div>
+                    </div>
+                    <div class="instrument-row">
+                        <span class="instrument-label">Высокие</span>
+                        <div id="hihatGrid" class="grid">
+                            <!-- 16 buttons will be added here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer>
+    <footer class="poly-panel">
         <div class="footer-content">
             <div class="version">v1.2.0</div>
-            
         </div>
     </footer>
 
