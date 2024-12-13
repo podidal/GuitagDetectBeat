@@ -9,6 +9,17 @@ class BPMDetector {
         this.lastBeatTime = 0;
         this.currentPattern = 'custom';
 
+        // Visualization elements
+        this.oscilloscope = document.getElementById('oscilloscope');
+        this.oscilloscopeCtx = this.oscilloscope.getContext('2d');
+        this.volumeBar = document.getElementById('volumeBar');
+        this.peakMarker = document.getElementById('peakMarker');
+        
+        // Visualization properties
+        this.peakEnergy = 0;
+        this.smoothedEnergy = 0;
+        this.energyHistory = new Array(100).fill(0);
+
         // Custom pattern grid state
         this.customPattern = {
             kick: new Array(16).fill(false),
@@ -101,43 +112,130 @@ class BPMDetector {
             this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const source = this.audioContext.createMediaStreamSource(this.stream);
             
-            // Create analyzer node with better settings for rhythm detection
-            const analyser = this.audioContext.createAnalyser();
-            analyser.fftSize = 4096; // Увеличиваем для лучшего разрешения
-            analyser.smoothingTimeConstant = 0.4; // Меньше сглаживания для более четкого определения атак
-            source.connect(analyser);
+            // Create analyzer nodes
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 2048;
+            this.analyser.smoothingTimeConstant = 0.4;
 
-            // Создаем фильтр для выделения низких частот (для лучшего определения ритма)
+            this.volumeAnalyser = this.audioContext.createAnalyser();
+            this.volumeAnalyser.fftSize = 1024;
+            this.volumeAnalyser.smoothingTimeConstant = 0.2;
+
+            // Create bandpass filter
             const filter = this.audioContext.createBiquadFilter();
             filter.type = 'bandpass';
-            filter.frequency.value = 100; // Фокус на низких частотах
+            filter.frequency.value = 100;
             filter.Q.value = 1.0;
-            
-            source.connect(filter);
-            filter.connect(analyser);
 
-            // Process audio
-            this.processAudio(analyser);
+            // Connect nodes
+            source.connect(this.analyser);
+            source.connect(this.volumeAnalyser);
+            source.connect(filter);
+            filter.connect(this.analyser);
+
+            // Start visualization
+            this.drawOscilloscope();
+            this.updateVolumeMeter();
+
+            // Process audio for beat detection
+            this.processAudio();
         } catch (error) {
             console.error('Error accessing microphone:', error);
             alert('Error accessing microphone. Please ensure microphone permissions are granted.');
         }
     }
 
-    processAudio(analyser) {
-        const bufferLength = analyser.frequencyBinCount;
+    drawOscilloscope() {
+        if (!this.isListening) return;
+
+        const width = this.oscilloscope.width;
+        const height = this.oscilloscope.height;
+        const bufferLength = this.analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
-        const energyThreshold = 1.5; // Порог для определения удара
+
+        this.analyser.getByteTimeDomainData(dataArray);
+
+        // Clear canvas
+        this.oscilloscopeCtx.fillStyle = 'rgb(0, 0, 0)';
+        this.oscilloscopeCtx.fillRect(0, 0, width, height);
+
+        // Draw waveform
+        this.oscilloscopeCtx.lineWidth = 2;
+        this.oscilloscopeCtx.strokeStyle = 'rgb(0, 255, 0)';
+        this.oscilloscopeCtx.beginPath();
+
+        const sliceWidth = width / bufferLength;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+            const v = dataArray[i] / 128.0;
+            const y = v * height / 2;
+
+            if (i === 0) {
+                this.oscilloscopeCtx.moveTo(x, y);
+            } else {
+                this.oscilloscopeCtx.lineTo(x, y);
+            }
+
+            x += sliceWidth;
+        }
+
+        this.oscilloscopeCtx.lineTo(width, height / 2);
+        this.oscilloscopeCtx.stroke();
+
+        requestAnimationFrame(() => this.drawOscilloscope());
+    }
+
+    updateVolumeMeter() {
+        if (!this.isListening) return;
+
+        const dataArray = new Uint8Array(this.volumeAnalyser.frequencyBinCount);
+        this.volumeAnalyser.getByteFrequencyData(dataArray);
+
+        // Calculate current volume level (RMS)
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i] * dataArray[i];
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+        const volume = Math.min(100, (rms / 128) * 100);
+
+        // Update volume history
+        this.energyHistory.push(volume);
+        this.energyHistory.shift();
+
+        // Calculate average volume
+        const avgVolume = this.energyHistory.reduce((a, b) => a + b) / this.energyHistory.length;
+
+        // Update peak marker
+        if (volume > this.peakEnergy) {
+            this.peakEnergy = volume;
+        } else {
+            this.peakEnergy = Math.max(avgVolume, this.peakEnergy * 0.95);
+        }
+
+        // Smooth the current energy value
+        this.smoothedEnergy = this.smoothedEnergy * 0.9 + volume * 0.1;
+
+        // Update visual elements
+        this.volumeBar.style.width = `${this.smoothedEnergy}%`;
+        this.peakMarker.style.right = `${100 - this.peakEnergy}%`;
+
+        requestAnimationFrame(() => this.updateVolumeMeter());
+    }
+
+    processAudio() {
+        const bufferLength = this.analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        const energyThreshold = 1.5;
         let lastEnergy = 0;
-        let energyHistory = [];
-        const historyLength = 10;
 
         const analyze = () => {
             if (!this.isListening) return;
 
-            analyser.getByteTimeDomainData(dataArray);
+            this.analyser.getByteTimeDomainData(dataArray);
             
-            // Вычисляем RMS (Root Mean Square) энергию сигнала
+            // Calculate RMS energy
             let energy = 0;
             for (let i = 0; i < bufferLength; i++) {
                 const amplitude = (dataArray[i] - 128) / 128;
@@ -145,19 +243,19 @@ class BPMDetector {
             }
             energy = Math.sqrt(energy / bufferLength);
 
-            // Сохраняем историю энергии
-            energyHistory.push(energy);
-            if (energyHistory.length > historyLength) {
-                energyHistory.shift();
+            // Update energy history
+            this.energyHistory.push(energy);
+            if (this.energyHistory.length > 10) {
+                this.energyHistory.shift();
             }
 
-            // Вычисляем среднюю энергию
-            const averageEnergy = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
+            // Calculate average energy
+            const averageEnergy = this.energyHistory.reduce((a, b) => a + b) / this.energyHistory.length;
 
-            // Определяем удар, если энергия превышает среднюю на определенный порог
+            // Detect beat
             if (energy > averageEnergy * energyThreshold && 
                 energy > lastEnergy && 
-                Date.now() - this.lastBeatTime > 200) { // Минимальный интервал между ударами
+                Date.now() - this.lastBeatTime > 200) {
                 
                 this.beatDetected();
                 this.lastBeatTime = Date.now();
