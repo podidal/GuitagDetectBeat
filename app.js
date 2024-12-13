@@ -2,13 +2,14 @@ class BPMDetector {
     constructor() {
         this.audioProcessor = new AudioProcessor();
         this.isListening = false;
-        this.fixedBPM = 90; 
+        this.fixedBPM = 90;
         this.beatTimes = [];
         this.lastBeatTime = 0;
+        this.rhythmPatterns = new RhythmPatterns();
         this.currentPattern = 'custom';
         this.tapTimes = [];
         this.lastTapTime = 0;
-        this.version = '1.0.0';
+        this.version = '1.2.0';
 
         // Visualization elements
         this.waveCanvas = document.getElementById('audioVisualizerWave');
@@ -47,6 +48,9 @@ class BPMDetector {
 
         // Initialize pattern grid
         this.initializePatternGrid();
+        
+        // Set up pattern buttons
+        this.setupPatternButtons();
 
         // Initialize displays with default BPM
         this.bpmDisplay.textContent = `Detected BPM: ${this.fixedBPM}`;
@@ -57,7 +61,7 @@ class BPMDetector {
         
         // Set version
         if (this.versionDisplay) {
-            this.versionDisplay.textContent = 'v1.0.2';
+            this.versionDisplay.textContent = 'v1.2.0';
         }
 
         // Set up audio processor callbacks
@@ -73,7 +77,7 @@ class BPMDetector {
         // Bind event listeners
         this.startButton.addEventListener('click', () => this.toggleListening());
         this.fixBpmButton.addEventListener('click', () => this.fixBPM());
-        this.playRhythmButton.addEventListener('click', () => this.toggleRhythm());
+        this.playRhythmButton.addEventListener('click', () => this.playRhythm());
 
         // Add pattern button listeners
         Object.entries(this.patternButtons).forEach(([pattern, button]) => {
@@ -98,42 +102,110 @@ class BPMDetector {
         }
     }
 
-    initializePatternGrid() {
-        // Set up grid button listeners
+    setupPatternButtons() {
+        const patterns = this.rhythmPatterns.getAllPatterns();
+        patterns.forEach(pattern => {
+            const button = document.getElementById(`pattern-${pattern.id}`);
+            if (button) {
+                button.addEventListener('click', () => this.setPattern(pattern.id));
+                button.title = pattern.description;
+            }
+        });
+    }
+
+    setPattern(patternId) {
+        // Remove active class from all pattern buttons
+        document.querySelectorAll('.pattern-btn').forEach(btn => btn.classList.remove('active'));
+        
+        // Add active class to selected button
+        const selectedButton = document.getElementById(`pattern-${patternId}`);
+        if (selectedButton) {
+            selectedButton.classList.add('active');
+        }
+
+        // Get the pattern
+        const pattern = this.rhythmPatterns.getPattern(patternId);
+        this.currentPattern = patternId;
+
+        // Update pattern info
+        document.getElementById('currentPatternName').textContent = pattern.name;
+        document.getElementById('patternDescription').textContent = pattern.description;
+
+        // Update grid buttons
         ['kick', 'snare', 'hihat'].forEach(instrument => {
             const grid = document.getElementById(`${instrument}Grid`);
             if (grid) {
-                grid.querySelectorAll('.grid-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const beat = parseInt(btn.dataset.beat);
-                        this.customPattern[instrument][beat] = !this.customPattern[instrument][beat];
-                        btn.classList.toggle('active', this.customPattern[instrument][beat]);
-                    });
-                });
+                const buttons = grid.getElementsByClassName('grid-button');
+                for (let i = 0; i < buttons.length; i++) {
+                    buttons[i].classList.toggle('active', pattern[instrument][i]);
+                }
             }
         });
-
-        // Set default pattern
-        this.setDefaultCustomPattern();
     }
 
-    setDefaultCustomPattern() {
-        // Basic pattern: kick on 1 and 3, snare on 2 and 4, hihat on every beat
-        const defaultPattern = {
-            kick: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
-            snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-            hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0]
-        };
-
-        Object.entries(defaultPattern).forEach(([instrument, pattern]) => {
-            pattern.forEach((value, beat) => {
-                const btn = document.querySelector(`#${instrument}Grid .grid-btn[data-beat="${beat}"]`);
-                if (btn && value) {
-                    btn.classList.add('active');
-                    this.customPattern[instrument][beat] = true;
+    initializePatternGrid() {
+        ['kick', 'snare', 'hihat'].forEach(instrument => {
+            const grid = document.getElementById(`${instrument}Grid`);
+            if (grid) {
+                // Clear existing buttons
+                grid.innerHTML = '';
+                
+                // Create 16 buttons for each instrument
+                for (let i = 0; i < 16; i++) {
+                    const button = document.createElement('button');
+                    button.className = 'grid-button';
+                    button.addEventListener('click', () => {
+                        button.classList.toggle('active');
+                        if (this.currentPattern === 'custom') {
+                            this.rhythmPatterns.setCustomPattern(
+                                instrument,
+                                i,
+                                button.classList.contains('active')
+                            );
+                        }
+                    });
+                    grid.appendChild(button);
                 }
-            });
+            }
         });
+    }
+
+    playRhythm() {
+        if (!this.isPlayingRhythm) {
+            if (!this.rhythmContext) {
+                this.rhythmContext = new AudioContext();
+            }
+            
+            const pattern = this.rhythmPatterns.getPattern(this.currentPattern);
+            const bpm = this.fixedBPM;
+            const secondsPerBeat = 60.0 / bpm;
+            const secondsPerStep = secondsPerBeat / 4; // 16th notes
+            
+            let step = 0;
+            
+            // Reset current step indicators
+            document.querySelectorAll('.grid-button').forEach(btn => btn.classList.remove('current'));
+            
+            this.rhythmInterval = setInterval(() => {
+                const currentTime = this.rhythmContext.currentTime;
+                
+                // Update current step indicator
+                document.querySelectorAll('.grid-button').forEach(btn => btn.classList.remove('current'));
+                document.querySelectorAll(`.grid-button:nth-child(${step + 1})`).forEach(btn => btn.classList.add('current'));
+                
+                // Play sounds for active steps
+                if (pattern.kick[step]) this.playDrumSound('kick', currentTime);
+                if (pattern.snare[step]) this.playDrumSound('snare', currentTime);
+                if (pattern.hihat[step]) this.playDrumSound('hihat', currentTime);
+                
+                step = (step + 1) % 16;
+            }, secondsPerStep * 1000);
+            
+            this.isPlayingRhythm = true;
+            this.playRhythmButton.textContent = 'Stop';
+        } else {
+            this.stopRhythm();
+        }
     }
 
     async toggleListening() {
@@ -419,124 +491,18 @@ class BPMDetector {
         osc.stop(time + 0.1);
     }
 
-    createCustomPattern(time, beatNumber, subBeat) {
-        const beatIndex = beatNumber * 4 + subBeat;
-        
-        if (this.customPattern.kick[beatIndex]) {
-            this.createKick(time, beatNumber === 0 ? 1.2 : 1);
+    playDrumSound(instrument, time) {
+        switch (instrument) {
+            case 'kick':
+                this.createKick(time);
+                break;
+            case 'snare':
+                this.createSnare(time);
+                break;
+            case 'hihat':
+                this.createHihat(time);
+                break;
         }
-        if (this.customPattern.snare[beatIndex]) {
-            this.createSnare(time, 0.8);
-        }
-        if (this.customPattern.hihat[beatIndex]) {
-            this.createHihat(time, beatNumber === 0 && subBeat === 0);
-        }
-    }
-
-    createBeats(time, beatNumber, barCount) {
-        if (this.currentPattern === 'custom') {
-            // For custom pattern, we divide each beat into 4 sixteenth notes
-            for (let i = 0; i < 4; i++) {
-                const subBeatTime = time + (i * (60 / this.fixedBPM) / 4);
-                this.createCustomPattern(subBeatTime, beatNumber, i);
-            }
-        } else {
-            switch(this.currentPattern) {
-                case 'rock':
-                    this.createRockPattern(time, beatNumber, barCount);
-                    break;
-                case 'funk':
-                    this.createFunkPattern(time, beatNumber, barCount);
-                    break;
-                case 'jazz':
-                    this.createJazzPattern(time, beatNumber, barCount);
-                    break;
-            }
-        }
-    }
-
-    createRockPattern(time, beatNumber, isLastBar) {
-        if (isLastBar && beatNumber === 3) {
-            // Fill on the last beat of bar 4
-            for (let i = 0; i < 4; i++) {
-                this.createSnare(time + (i * 0.25 * (60 / this.fixedBPM)), 0.7 - (i * 0.1));
-            }
-        } else {
-            // Basic rock pattern
-            if (beatNumber % 2 === 0) {
-                // Beats 1 and 3: Kick
-                this.createKick(time, beatNumber === 0 ? 1.2 : 1);
-            } else {
-                // Beats 2 and 4: Snare
-                this.createSnare(time, beatNumber === 3 ? 0.9 : 0.8);
-            }
-            // Hi-hat on every beat
-            this.createHihat(time, beatNumber === 0);
-        }
-    }
-
-    createFunkPattern(time, beatNumber, isLastBar) {
-        if (isLastBar && beatNumber >= 2) {
-            // Syncopated fill on last two beats of bar 4
-            const divisions = 3;
-            for (let i = 0; i < divisions; i++) {
-                this.createSnare(time + (i * (60 / this.fixedBPM) / divisions), 0.7);
-            }
-        } else {
-            // Funk pattern with syncopated kicks
-            this.createHihat(time, beatNumber === 0); // Hi-hat on every beat
-            
-            if (beatNumber === 0) {
-                this.createKick(time, 1.2);
-            } else if (beatNumber === 1) {
-                this.createSnare(time, 0.8);
-                this.createKick(time + (60 / this.fixedBPM) / 2, 0.9); // "and" of 2
-            } else if (beatNumber === 2) {
-                this.createKick(time, 1);
-            } else {
-                this.createSnare(time, 0.9);
-                if (!isLastBar) {
-                    this.createKick(time + (60 / this.fixedBPM) / 2, 0.9); // "and" of 4
-                }
-            }
-        }
-    }
-
-    createJazzPattern(time, beatNumber, isLastBar) {
-        if (isLastBar && beatNumber >= 2) {
-            // Swing fill on last two beats of bar 4
-            const divisions = 4;
-            for (let i = 0; i < divisions; i++) {
-                const swingOffset = i % 2 === 1 ? 0.33 : 0;
-                this.createSnare(
-                    time + (i * (60 / this.fixedBPM) / divisions) + swingOffset,
-                    0.6 + (i * 0.1)
-                );
-            }
-        } else {
-            // Jazz ride pattern with swing
-            const swingOffset = beatNumber % 2 === 1 ? 0.33 : 0;
-            this.createHihat(time + swingOffset, beatNumber === 0);
-
-            if (beatNumber === 0) {
-                this.createKick(time, 1.1);
-            } else if (beatNumber === 2) {
-                this.createKick(time, 0.9);
-            }
-            
-            // Add swing eighth notes on the ride
-            if (!isLastBar) {
-                this.createHihat(time + (60 / this.fixedBPM) / 3, false);
-            }
-        }
-    }
-
-    setPattern(pattern) {
-        this.currentPattern = pattern;
-        // Update button states
-        Object.entries(this.patternButtons).forEach(([p, button]) => {
-            button.classList.toggle('active', p === pattern);
-        });
     }
 
     initializeEventListeners() {
@@ -586,46 +552,16 @@ class BPMDetector {
         }
     }
 
-    toggleRhythm() {
-        if (!this.isPlayingRhythm) {
-            if (!this.rhythmContext) {
-                this.rhythmContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            
-            if (this.rhythmContext.state === 'suspended') {
-                this.rhythmContext.resume();
-            }
-            
-            let lastScheduledTime = this.rhythmContext.currentTime;
-            let beatCount = 0;
-            
-            const scheduleBeats = () => {
-                const currentTime = this.rhythmContext.currentTime;
-                
-                while (lastScheduledTime < currentTime + 0.5) {
-                    const barCount = Math.floor(beatCount / 4);
-                    this.createBeats(lastScheduledTime, beatCount % 4, barCount);
-                    lastScheduledTime += 60 / this.fixedBPM;
-                    beatCount++;
-                }
-            };
-            
-            scheduleBeats();
-            this.rhythmInterval = setInterval(scheduleBeats, 100);
-            
-            this.isPlayingRhythm = true;
-            this.playRhythmButton.textContent = 'Stop Rhythm';
-        } else {
-            if (this.rhythmInterval) {
-                clearInterval(this.rhythmInterval);
-            }
-            if (this.rhythmContext) {
-                this.rhythmContext.close();
-                this.rhythmContext = null;
-            }
-            this.isPlayingRhythm = false;
-            this.playRhythmButton.textContent = 'Play Rhythm';
+    stopRhythm() {
+        if (this.rhythmInterval) {
+            clearInterval(this.rhythmInterval);
         }
+        if (this.rhythmContext) {
+            this.rhythmContext.close();
+            this.rhythmContext = null;
+        }
+        this.isPlayingRhythm = false;
+        this.playRhythmButton.textContent = 'Play';
     }
 }
 

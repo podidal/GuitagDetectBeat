@@ -31,28 +31,37 @@
         <div class="rhythm-controls">
             <button id="playRhythm" class="btn">Play Rhythm</button>
             <div class="pattern-buttons">
-                <button id="patternRock" class="btn pattern-btn">Rock</button>
-                <button id="patternFunk" class="btn pattern-btn">Funk</button>
-                <button id="patternJazz" class="btn pattern-btn">Jazz</button>
-                <button id="patternCustom" class="btn pattern-btn active">Custom</button>
+                <button id="pattern-sixEight" class="btn pattern-btn" title="Классический шестерочный бой (6/8)">Шестерка бой</button>
+                <button id="pattern-eightBeat" class="btn pattern-btn" title="Популярный восьмерочный бой (4/4)">Восьмерка бой</button>
+                <button id="pattern-quarterBeat" class="btn pattern-btn" title="Простой четвертной бой (4/4)">Четвертной бой</button>
+                <button id="pattern-fastFinger" class="btn pattern-btn" title="Быстрый пальцевой перебор">Быстрый перебор</button>
+                <button id="pattern-syncopated" class="btn pattern-btn" title="Синкопированный ритм">Синкопированный</button>
+                <button id="pattern-waltz" class="btn pattern-btn" title="Вальсовый ритм (3/4)">Вальсовый</button>
+                <button id="pattern-rumba" class="btn pattern-btn" title="Румба гитарный ритм">Румба</button>
+                <button id="pattern-bossaNova" class="btn pattern-btn" title="Босса-нова гитарный ритм">Босса-нова</button>
+                <button id="pattern-custom" class="btn pattern-btn active">Свой ритм</button>
             </div>
         </div>
 
         <div class="pattern-editor">
+            <div class="pattern-info">
+                <span class="pattern-name">Текущий ритм: <span id="currentPatternName">Свой ритм</span></span>
+                <span class="pattern-description" id="patternDescription">Создайте свой ритм</span>
+            </div>
             <div class="instrument-row">
-                <span class="instrument-label">Kick</span>
+                <span class="instrument-label">Бас</span>
                 <div id="kickGrid" class="grid">
                     <!-- 16 buttons will be added here -->
                 </div>
             </div>
             <div class="instrument-row">
-                <span class="instrument-label">Snare</span>
+                <span class="instrument-label">Средние</span>
                 <div id="snareGrid" class="grid">
                     <!-- 16 buttons will be added here -->
                 </div>
             </div>
             <div class="instrument-row">
-                <span class="instrument-label">Hi-hat</span>
+                <span class="instrument-label">Высокие</span>
                 <div id="hihatGrid" class="grid">
                     <!-- 16 buttons will be added here -->
                 </div>
@@ -67,6 +76,7 @@
         </div>
     </footer>
 
+    <script src="rhythmPatterns.js"></script>
     <script src="audioProcessor.js"></script>
     <script src="app.js"></script>
     <script>
