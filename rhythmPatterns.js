@@ -1,5 +1,19 @@
 class RhythmPatterns {
-    constructor() {
+    constructor(audioContext) {
+        this.audioContext = audioContext;
+        this.rhythmSources = [];
+        this.isPlaying = false;
+        this.currentBPM = 90;
+        this.masterGainNode = null;
+        
+        // Fade-in properties
+        this.fadeInDuration = 2; // seconds
+        this.fadeInStartTime = 0;
+        
+        // Rhythm playback properties
+        this.rhythmInterval = null;
+        this.beatCallback = null;
+        
         this.currentPattern = 'custom';
         this.patterns = {
             basic: {
@@ -52,13 +66,128 @@ class RhythmPatterns {
                 hihat: new Array(16).fill(false)
             }
         };
+    }
 
-        this.audioContext = null;
-        this.rhythmSources = [];
-        this.bpm = 120;
+    setupMasterGain() {
+        // Create master gain node for volume control
+        this.masterGainNode = this.audioContext.createGain();
+        this.masterGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        this.masterGainNode.connect(this.audioContext.destination);
+    }
+
+    startRhythmWithFadeIn() {
+        if (this.isPlaying) return;
+
+        this.setupMasterGain();
+        this.isPlaying = true;
+        this.fadeInStartTime = this.audioContext.currentTime;
+
+        // Exponential fade-in for smoother volume increase
+        this.masterGainNode.gain.exponentialRampToValueAtTime(
+            1, 
+            this.audioContext.currentTime + this.fadeInDuration
+        );
+
+        // Start rhythm playback
+        this.startRhythmLoop();
+    }
+
+    startRhythmLoop() {
+        // Calculate beat interval based on BPM
+        const beatInterval = 60 / this.currentBPM;
+        
+        // Create oscillators for different drum sounds
+        const kick = this.createDrumSound('sine', 60, 0.7);
+        const snare = this.createDrumSound('triangle', 200, 0.5);
+        const hiHat = this.createDrumSound('square', 1000, 0.3);
+
+        // Connect to master gain
+        [kick, snare, hiHat].forEach(sound => 
+            sound.connect(this.masterGainNode)
+        );
+
+        // Rhythm pattern (4/4 time signature)
+        this.rhythmInterval = setInterval(() => {
+            const currentBeat = Date.now() % 4;
+            
+            // Basic 4/4 rhythm pattern
+            switch(currentBeat) {
+                case 0: // First beat (strongest)
+                    this.playSound(kick, 1);
+                    break;
+                case 1:
+                    this.playSound(hiHat, 0.6);
+                    break;
+                case 2:
+                    this.playSound(snare, 0.8);
+                    this.playSound(hiHat, 0.5);
+                    break;
+                case 3:
+                    this.playSound(hiHat, 0.4);
+                    break;
+            }
+
+            // Trigger beat callback if set
+            if (this.beatCallback) {
+                this.beatCallback(currentBeat);
+            }
+        }, beatInterval * 1000);
+    }
+
+    createDrumSound(type, frequency, volume) {
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+        
+        gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+
+        oscillator.connect(gainNode);
+        return gainNode;
+    }
+
+    playSound(soundNode, volumeMultiplier = 1) {
+        const now = this.audioContext.currentTime;
+        
+        // Quick envelope for percussive sound
+        soundNode.gain.cancelScheduledValues(now);
+        soundNode.gain.setValueAtTime(soundNode.gain.value, now);
+        soundNode.gain.linearRampToValueAtTime(0.001, now + 0.1);
+    }
+
+    stopRhythm() {
+        if (!this.isPlaying) return;
+
+        // Fade out
+        if (this.masterGainNode) {
+            this.masterGainNode.gain.exponentialRampToValueAtTime(
+                0.001, 
+                this.audioContext.currentTime + 1
+            );
+        }
+
+        // Clear interval and reset flags
+        if (this.rhythmInterval) {
+            clearInterval(this.rhythmInterval);
+            this.rhythmInterval = null;
+        }
+
         this.isPlaying = false;
-        this.fadeStartTime = 0;
-        this.fadeDuration = 2000; // 2 seconds fade-in
+    }
+
+    setBPM(bpm) {
+        this.currentBPM = Math.max(40, Math.min(240, bpm));
+        
+        // If already playing, restart with new BPM
+        if (this.isPlaying) {
+            this.stopRhythm();
+            this.startRhythmWithFadeIn();
+        }
+    }
+
+    setBeatCallback(callback) {
+        this.beatCallback = callback;
     }
 
     getPattern(name) {
@@ -111,94 +240,6 @@ class RhythmPatterns {
             name: pattern.name,
             description: pattern.description
         }));
-    }
-
-    setBPM(newBPM) {
-        this.bpm = Math.max(40, Math.min(240, newBPM));
-    }
-
-    startRhythm(pattern, autoStart = false) {
-        // Stop any existing rhythm
-        this.stopRhythm();
-
-        // Initialize audio context
-        if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        this.currentPattern = pattern;
-        this.isPlaying = true;
-        this.fadeStartTime = this.audioContext.currentTime;
-
-        const secondsPerBeat = 60.0 / this.bpm;
-        const secondsPerStep = secondsPerBeat / 4; // 16th notes
-
-        // Create master gain node for fade control
-        const masterGain = this.audioContext.createGain();
-        masterGain.connect(this.audioContext.destination);
-        masterGain.gain.setValueAtTime(0, this.audioContext.currentTime);
-
-        // Fade-in curve
-        masterGain.gain.linearRampToValueAtTime(1, 
-            this.audioContext.currentTime + this.fadeDuration / 1000
-        );
-
-        // Play each sound type in the pattern
-        ['kick', 'snare', 'hihat'].forEach(soundType => {
-            pattern[soundType].forEach((isActive, index) => {
-                if (isActive) {
-                    const time = index * secondsPerStep;
-                    this.playSound(soundType, time, masterGain);
-                }
-            });
-        });
-
-        // Schedule repeating pattern
-        this.rhythmInterval = setInterval(() => {
-            const now = this.audioContext.currentTime;
-            ['kick', 'snare', 'hihat'].forEach(soundType => {
-                pattern[soundType].forEach((isActive, index) => {
-                    if (isActive) {
-                        const time = now + index * secondsPerStep;
-                        this.playSound(soundType, time, masterGain);
-                    }
-                });
-            });
-        }, secondsPerBeat * 1000);
-    }
-
-    playSound(soundType, time, masterGain) {
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-
-        // Different frequencies for each sound type
-        const frequencies = {
-            kick: 80,    // Low frequency for kick
-            snare: 200,  // Mid frequency for snare
-            hihat: 6000  // High frequency for hi-hat
-        };
-
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(frequencies[soundType], time);
-
-        // Envelope
-        gainNode.gain.setValueAtTime(0, time);
-        gainNode.gain.linearRampToValueAtTime(0.7, time + 0.01);
-        gainNode.gain.linearRampToValueAtTime(0, time + 0.1);
-
-        oscillator.connect(gainNode);
-        gainNode.connect(masterGain);
-
-        oscillator.start(time);
-        oscillator.stop(time + 0.1);
-    }
-
-    stopRhythm() {
-        if (this.rhythmInterval) {
-            clearInterval(this.rhythmInterval);
-            this.rhythmInterval = null;
-        }
-        this.isPlaying = false;
     }
 }
 

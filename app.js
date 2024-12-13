@@ -1,14 +1,15 @@
 class BPMDetector {
     constructor() {
         this.audioProcessor = new AudioProcessor();
+        this.isListening = false;
+        this.fixedBPM = 90;
+        this.beatTimes = [];
+        this.lastBeatTime = 0;
         this.rhythmPatterns = new RhythmPatterns();
-        this.currentPattern = 'basic';
+        this.currentPattern = 'custom';
+        this.tapTimes = [];
+        this.lastTapTime = 0;
         this.version = '1.2.0';
-        
-        // Rhythm auto-start state
-        this.fixedBPM = null;
-        this.isAutoStartEnabled = false;
-        this.autoStartTimer = null;
 
         // Visualization elements
         this.waveCanvas = document.getElementById('audioVisualizerWave');
@@ -30,9 +31,12 @@ class BPMDetector {
 
         // DOM Elements
         this.startButton = document.getElementById('startListening');
+        this.bpmDisplay = document.getElementById('bpmDisplay');
+        this.fixBpmButton = document.getElementById('fixBpm');
         this.playRhythmButton = document.getElementById('playRhythm');
         this.versionDisplay = document.getElementById('version');
-        this.autoStartToggle = document.getElementById('autoStartToggle');
+        this.tapBpmButton = document.getElementById('tapBpm');
+        this.manualBpmInput = document.getElementById('manualBpm');
 
         // Pattern buttons
         this.patternButtons = {
@@ -45,29 +49,37 @@ class BPMDetector {
             random: document.getElementById('pattern-random')
         };
 
-        // Initialize components
+        // Initialize pattern grid
         this.initializePatternGrid();
+        
+        // Set up pattern buttons
         this.setupPatternButtons();
-        this.setupAutoStartToggle();
-        this.updateVersion();
 
-        // Set version display
+        // Initialize displays with default BPM
+        this.bpmDisplay.textContent = `Detected BPM: ${this.fixedBPM}`;
+        this.playRhythmButton.disabled = false;
+
+        // Update version display
+        this.updateVersion();
+        
+        // Set version
         if (this.versionDisplay) {
             this.versionDisplay.textContent = 'v1.2.0';
         }
 
         // Set up audio processor callbacks
         this.audioProcessor.setCallbacks(
+            () => this.beatDetected(),
             (data) => this.drawWaveform(data),
             (energy) => {
                 this.updateEnergyHistory(energy);
                 this.updateEnergyMeter(energy);
-                this.checkAutoStartRhythm(energy);
             }
         );
 
         // Bind event listeners
         this.startButton.addEventListener('click', () => this.toggleListening());
+        this.fixBpmButton.addEventListener('click', () => this.fixBPM());
         this.playRhythmButton.addEventListener('click', () => this.playRhythm());
 
         // Add pattern button listeners
@@ -75,61 +87,116 @@ class BPMDetector {
             button.addEventListener('click', () => this.setPattern(pattern));
         });
 
+        // Initialize event listeners
+        this.initializeEventListeners();
+
         // Audio context for rhythm playback
         this.rhythmContext = null;
         this.isPlayingRhythm = false;
         this.rhythmInterval = null;
-    }
 
-    setupAutoStartToggle() {
-        if (this.autoStartToggle) {
-            this.autoStartToggle.addEventListener('change', (e) => {
-                this.isAutoStartEnabled = e.target.checked;
-                if (!this.isAutoStartEnabled) {
-                    // Reset auto-start state if disabled
-                    this.fixedBPM = null;
-                    clearTimeout(this.autoStartTimer);
+        // BPM Detection and Management
+        this.currentBPM = null;
+        this.isFixedBPM = false;
+
+        // Rhythm Auto-Start and Management
+        this.autoStartEnabled = true;
+        this.playIndicator = null;
+
+        this.updateBPMDisplay = (bpm) => {
+            const bpmValueElement = document.getElementById('bpmValue');
+            const setBpmButton = document.getElementById('setBpmButton');
+
+            if (bpm) {
+                bpmValueElement.textContent = Math.round(bpm);
+                bpmValueElement.classList.remove('no-bpm');
+                setBpmButton.disabled = false;
+            } else {
+                bpmValueElement.textContent = '--';
+                bpmValueElement.classList.add('no-bpm');
+                setBpmButton.disabled = true;
+            }
+        }
+
+        this.initializeBPMControls = () => {
+            const setBpmButton = document.getElementById('setBpmButton');
+            
+            this.audioProcessor.setCallbacks(
+                () => {}, // Beat callback (optional)
+                null, // Visualization callback
+                (energy) => {
+                    // Optional energy visualization or processing
+                }
+            );
+
+            // Periodically calculate BPM with more sophisticated averaging
+            const bpmUpdateInterval = setInterval(() => {
+                if (!this.isFixedBPM) {
+                    const detectedBPM = this.audioProcessor.calculateBPM();
+                    if (detectedBPM) {
+                        this.currentBPM = detectedBPM;
+                        this.updateBPMDisplay(this.currentBPM);
+
+                        // Auto-start rhythm if consistent and enabled
+                        if (this.autoStartEnabled && 
+                            this.audioProcessor.checkConsistency(this.currentBPM)) {
+                            this.rhythmPatterns.startRhythmWithFadeIn();
+                            this.updatePlayIndicator(true);
+                        }
+                    } else {
+                        this.updateBPMDisplay(null);
+                    }
+                }
+            }, 1000); // More frequent updates for responsiveness
+
+            // Set BPM Button Logic
+            setBpmButton.addEventListener('click', () => {
+                if (this.currentBPM) {
+                    this.isFixedBPM = !this.isFixedBPM;
+                    setBpmButton.classList.toggle('active', this.isFixedBPM);
+                    
+                    if (this.isFixedBPM) {
+                        // Pass fixed BPM to rhythm and beat detection systems
+                        this.rhythmPatterns.setBPM(this.currentBPM);
+                        this.audioProcessor.setFixedBPM(this.currentBPM);
+                        
+                        setBpmButton.textContent = 'Unlock BPM';
+                        setBpmButton.setAttribute('title', `Locked at ${this.currentBPM} BPM`);
+                    } else {
+                        // Reset fixed BPM
+                        this.rhythmPatterns.stopRhythm();
+                        this.updatePlayIndicator(false);
+                        
+                        setBpmButton.textContent = 'Set BPM';
+                        setBpmButton.removeAttribute('title');
+                    }
                 }
             });
-        }
-    }
 
-    checkAutoStartRhythm(energy) {
-        // Only check auto-start if enabled and listening
-        if (!this.isAutoStartEnabled || !this.audioProcessor.isListening) return;
-
-        // Detect consistent BPM
-        const detectedBPM = this.audioProcessor.calculateBPM();
-        
-        if (detectedBPM && !this.fixedBPM) {
-            this.fixedBPM = detectedBPM;
+            // Cleanup function to stop BPM updates when needed
+            return () => {
+                clearInterval(bpmUpdateInterval);
+            };
         }
 
-        // Check BPM consistency
-        if (this.fixedBPM && this.audioProcessor.isConsistentBPM(this.fixedBPM)) {
-            // Start rhythm automatically after a short delay
-            if (!this.autoStartTimer) {
-                this.autoStartTimer = setTimeout(() => {
-                    this.rhythmPatterns.startRhythm(
-                        this.rhythmPatterns.currentPattern || this.getDefaultPattern(), 
-                        true
-                    );
-                    this.autoStartTimer = null;
-                }, 2000); // 2-second delay for smooth transition
+        this.stopBPMUpdates = this.initializeBPMControls();
+
+        this.updatePlayIndicator = (isPlaying) => {
+            if (!this.playIndicator) this.initializePlayIndicator();
+            
+            if (isPlaying) {
+                this.playIndicator.classList.add('active');
+            } else {
+                this.playIndicator.classList.remove('active');
             }
-        } else {
-            // Reset auto-start timer if BPM is inconsistent
-            clearTimeout(this.autoStartTimer);
-            this.autoStartTimer = null;
         }
-    }
 
-    getDefaultPattern() {
-        return {
-            kick: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
-            snare: [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false],
-            hihat: [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]
-        };
+        this.initializePlayIndicator = () => {
+            this.playIndicator = document.createElement('div');
+            this.playIndicator.id = 'playIndicator';
+            this.playIndicator.classList.add('play-indicator');
+            document.querySelector('.bpm-container').appendChild(this.playIndicator);
+        }
     }
 
     updateVersion() {
@@ -248,7 +315,7 @@ class BPMDetector {
                 this.rhythmContext = new AudioContext();
             }
             
-            const bpm = 120;
+            const bpm = this.fixedBPM;
             const secondsPerBeat = 60.0 / bpm;
             const secondsPerStep = secondsPerBeat / 4; // 16th notes
             
@@ -311,12 +378,57 @@ class BPMDetector {
                 this.isListening = true;
                 this.startButton.textContent = 'Stop Listening';
                 this.startButton.classList.add('listening');
+                this.fixedBPM = null;
+                this.beatTimes = [];
             }
         } else {
             this.audioProcessor.stopListening();
             this.isListening = false;
             this.startButton.textContent = 'Start Listening';
             this.startButton.classList.remove('listening');
+        }
+    }
+
+    beatDetected() {
+        const now = Date.now();
+        this.beatTimes.push(now);
+
+        // Храним только последние 8 ударов для более точного расчета
+        if (this.beatTimes.length > 8) {
+            this.beatTimes.shift();
+        }
+
+        this.calculateBPM();
+    }
+
+    calculateBPM() {
+        if (this.beatTimes.length < 4) return; // Нужно минимум 4 удара для точного расчета
+
+        const intervals = [];
+        for (let i = 1; i < this.beatTimes.length; i++) {
+            intervals.push(this.beatTimes[i] - this.beatTimes[i - 1]);
+        }
+
+        // Удаляем выбросы (интервалы, сильно отличающиеся от среднего)
+        const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+        const filteredIntervals = intervals.filter(interval => 
+            Math.abs(interval - avgInterval) < avgInterval * 0.5
+        );
+
+        if (filteredIntervals.length < 2) return;
+
+        const cleanAvgInterval = filteredIntervals.reduce((a, b) => a + b) / filteredIntervals.length;
+        let bpm = Math.round(60000 / cleanAvgInterval);
+
+        // Корректируем BPM в разумных пределах
+        if (bpm < 60) bpm *= 2;
+        if (bpm > 200) bpm = Math.round(bpm / 2);
+
+        // Проверяем, что BPM в разумных пределах
+        if (bpm >= 40 && bpm <= 220) {
+            this.bpmDisplay.textContent = `Detected BPM: ${bpm}`;
+            this.fixedBPM = bpm;
+            this.fixBpmButton.disabled = false;
         }
     }
 
@@ -442,6 +554,14 @@ class BPMDetector {
         }
     }
 
+    fixBPM() {
+        this.fixedBPM = parseInt(this.bpmDisplay.textContent.match(/\d+/)[0]);
+        this.isListening = false;
+        this.startButton.textContent = 'Start Listening';
+        this.startButton.classList.remove('listening');
+        this.playRhythmButton.disabled = false;
+    }
+
     createKick(time, velocity = 1) {
         const osc = this.rhythmContext.createOscillator();
         const gain = this.rhythmContext.createGain();
@@ -555,6 +675,49 @@ class BPMDetector {
 
     initializeEventListeners() {
         // Add existing event listeners here
+        
+        // Add tap BPM functionality
+        this.tapBpmButton.addEventListener('click', () => this.handleTapBpm());
+        
+        // Add manual BPM input handler
+        this.manualBpmInput.addEventListener('change', (e) => {
+            const newBpm = parseInt(e.target.value);
+            if (newBpm >= 30 && newBpm <= 300) {
+                this.fixedBPM = newBpm;
+                this.bpmDisplay.textContent = `BPM: ${this.fixedBPM}`;
+            }
+        });
+    }
+
+    handleTapBpm() {
+        const currentTime = performance.now();
+        
+        // Remove taps that are older than 2 seconds
+        this.tapTimes = this.tapTimes.filter(time => currentTime - time < 2000);
+        
+        // Add new tap
+        this.tapTimes.push(currentTime);
+        
+        // Calculate BPM if we have at least 2 taps
+        if (this.tapTimes.length > 1) {
+            const intervals = [];
+            for (let i = 1; i < this.tapTimes.length; i++) {
+                intervals.push(this.tapTimes[i] - this.tapTimes[i - 1]);
+            }
+            
+            // Calculate average interval
+            const averageInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+            
+            // Convert to BPM
+            const bpm = Math.round(60000 / averageInterval);
+            
+            // Update BPM if it's within reasonable range
+            if (bpm >= 30 && bpm <= 300) {
+                this.fixedBPM = bpm;
+                this.bpmDisplay.textContent = `BPM: ${this.fixedBPM}`;
+                this.manualBpmInput.value = this.fixedBPM;
+            }
+        }
     }
 }
 

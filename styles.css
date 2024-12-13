@@ -9,6 +9,12 @@
     --shadow-light: rgba(0, 0, 0, 0.08);
     --shadow-medium: rgba(0, 0, 0, 0.12);
     --border-radius: 12px;
+    --background-secondary: #ffffff;
+    --shadow-dark: rgba(0, 0, 0, 0.2);
+    --accent-color: #3498db;
+    --accent-color-hover: #2980b9;
+    --background-tertiary: #f0f3f6;
+    --success-color: #2ecc71;
 }
 
 * {
@@ -210,66 +216,130 @@ canvas {
     transition: width 0.3s ease;
 }
 
-/* Auto-Start Toggle Styles */
-.auto-start-controls {
+.bpm-controls {
     display: flex;
+    gap: 10px;
     align-items: center;
-    justify-content: center;
-    margin: 15px 0;
 }
 
-.auto-start-label {
+.bpm-input {
+    width: 80px;
+    padding: 10px;
+    border: none;
+    border-radius: calc(var(--border-radius) / 2);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    text-align: center;
+    box-shadow: 
+        inset 0 2px 4px var(--shadow-light),
+        0 2px 4px var(--shadow-medium);
+}
+
+.bpm-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 15px 0;
+    background-color: var(--background-secondary);
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 
+        inset 2px 2px 5px var(--shadow-light),
+        inset -2px -2px 5px var(--shadow-dark);
+    transition: all 0.3s ease;
+}
+
+.bpm-display {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.bpm-label {
     font-weight: bold;
     color: var(--text-primary);
+    font-size: 1.1em;
+}
+
+#bpmValue {
+    font-size: 1.8em;
+    color: var(--accent-color);
+    min-width: 80px;
+    text-align: center;
+    font-weight: bold;
+    transition: color 0.3s ease;
+}
+
+#bpmValue.no-bpm {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.set-bpm-btn {
+    background-color: var(--accent-color);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
     cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
 }
 
-.auto-start-checkbox {
-    display: none;
+.set-bpm-btn:hover:not(:disabled) {
+    background-color: var(--accent-color-hover);
+    transform: scale(1.05);
 }
 
-.toggle-slider {
-    position: relative;
-    width: 50px;
-    height: 24px;
-    background-color: var(--bg-secondary);
-    border-radius: 12px;
-    transition: background-color 0.3s ease;
-    box-shadow: 
-        inset 2px 2px 5px var(--shadow-light),
-        inset -2px -2px 5px var(--shadow-medium);
+.set-bpm-btn:disabled {
+    background-color: var(--background-tertiary);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
-.toggle-slider::before {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    background-color: var(--accent-primary);
+.set-bpm-btn.active {
+    background-color: var(--success-color);
+    color: var(--text-primary);
+}
+
+.play-indicator {
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    transition: transform 0.3s ease;
-    box-shadow: 
-        2px 2px 4px var(--shadow-light),
-        -2px -2px 4px var(--shadow-medium);
+    background-color: var(--text-secondary);
+    margin-left: 10px;
+    transition: all 0.3s ease;
+    opacity: 0.5;
 }
 
-.auto-start-checkbox:checked + .toggle-slider {
-    background-color: var(--accent-secondary);
+.play-indicator.active {
+    background-color: var(--success-color);
+    box-shadow: 0 0 10px var(--success-color);
+    opacity: 1;
+    animation: pulse 1.5s infinite;
 }
 
-.auto-start-checkbox:checked + .toggle-slider::before {
-    transform: translateX(26px);
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
 }
 
-/* Removed BPM-related styles */
 footer {
     margin-top: 20px;
     text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
 }
 
 /* Responsive Design */

@@ -20,17 +20,18 @@
                 </div>
             </div>
             <button id="startListening" class="btn">Start Listening</button>
+            <div id="bpmDisplay">Detected BPM: 90</div>
             <button id="fixBpm" class="btn" disabled>Fix BPM</button>
-            <div class="bpm-input-group">
+            <div class="bpm-controls">
                 <input type="number" id="manualBpm" min="30" max="300" value="90" class="bpm-input">
                 <button id="tapBpm" class="btn">Tap BPM</button>
             </div>
-            <div class="auto-start-controls">
-                <label for="autoStartToggle" class="auto-start-label">
-                    Auto-Start Rhythm
-                    <input type="checkbox" id="autoStartToggle" class="auto-start-checkbox">
-                    <span class="toggle-slider"></span>
-                </label>
+            <div class="bpm-container">
+                <div class="bpm-display">
+                    <span class="bpm-label">BPM:</span>
+                    <span id="bpmValue" class="no-bpm">--</span>
+                    <button id="setBpmButton" class="set-bpm-btn" disabled>Set BPM</button>
+                </div>
             </div>
         </div>
 
