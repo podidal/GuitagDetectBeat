@@ -9,17 +9,21 @@ class BPMDetector {
         this.lastBeatTime = 0;
         this.currentPattern = 'custom';
 
+        // Tap tempo variables
+        this.tapTimes = [];
+        this.lastTapTime = 0;
+
         // Visualization elements
         this.waveCanvas = document.getElementById('audioVisualizerWave');
-        this.waveCtx = this.waveCanvas.getContext('2d');
+        this.waveCtx = this.waveCanvas?.getContext('2d');
         this.energyCanvas = document.getElementById('audioVisualizerEnergy');
-        this.energyCtx = this.energyCanvas.getContext('2d');
+        this.energyCtx = this.energyCanvas?.getContext('2d');
         this.energyBar = document.getElementById('energyBar');
         this.energyValue = document.getElementById('energyValue');
         
         // Visualization history
-        this.energyHistory = new Array(this.energyCanvas.width).fill(0);
-        
+        this.energyHistory = this.energyCanvas ? new Array(this.energyCanvas.width).fill(0) : [];
+
         // Custom pattern grid state
         this.customPattern = {
             kick: new Array(16).fill(false),
@@ -56,6 +60,14 @@ class BPMDetector {
         this.fixBpmButton.addEventListener('click', () => this.fixBPM());
         this.playRhythmButton.addEventListener('click', () => this.toggleRhythm());
         this.tapTempoButton.addEventListener('click', () => this.handleTap());
+
+        // Add keyboard support for tapping (spacebar)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); // Prevent page scrolling
+                this.handleTap();
+            }
+        });
 
         // Add pattern button listeners
         Object.entries(this.patternButtons).forEach(([pattern, button]) => {
@@ -176,10 +188,10 @@ class BPMDetector {
 
             lastEnergy = energy;
 
-            // Update visualizations
-            this.drawWaveform(dataArray);
-            this.updateEnergyHistory(energy);
-            this.updateEnergyMeter(energy);
+            // Update visualizations if elements exist
+            if (this.waveCtx) this.drawWaveform(dataArray);
+            if (this.energyCtx) this.updateEnergyHistory(energy);
+            if (this.energyBar && this.energyValue) this.updateEnergyMeter(energy);
 
             requestAnimationFrame(analyze);
         };
@@ -334,49 +346,36 @@ class BPMDetector {
 
     handleTap() {
         const now = Date.now();
-        this.tapTempoButton.classList.add('active');
         
-        // Remove active class after 100ms for visual feedback
-        setTimeout(() => {
-            this.tapTempoButton.classList.remove('active');
-        }, 100);
-
-        // Clear taps if more than 2 seconds have passed
+        // Clear tap history if too much time has passed
         if (now - this.lastTapTime > 2000) {
             this.tapTimes = [];
         }
-
+        
         this.tapTimes.push(now);
-        this.lastTapTime = now;
-
-        // Keep only the last 4 taps
+        
+        // Keep only last 4 taps
         if (this.tapTimes.length > 4) {
             this.tapTimes.shift();
         }
-
-        this.calculateTapBPM();
-    }
-
-    calculateTapBPM() {
-        if (this.tapTimes.length < 2) {
-            // If no taps yet, keep showing default BPM
-            this.tapBpmDisplay.textContent = `Tapped BPM: ${this.fixedBPM}`;
-            return;
+        
+        // Calculate BPM from taps
+        if (this.tapTimes.length > 1) {
+            const intervals = [];
+            for (let i = 1; i < this.tapTimes.length; i++) {
+                intervals.push(this.tapTimes[i] - this.tapTimes[i-1]);
+            }
+            
+            const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+            const bpm = Math.round(60000 / avgInterval);
+            
+            if (bpm >= 40 && bpm <= 220) {
+                this.fixedBPM = bpm;
+                this.tapBpmDisplay.textContent = `Tapped BPM: ${bpm}`;
+            }
         }
-
-        const intervals = [];
-        for (let i = 1; i < this.tapTimes.length; i++) {
-            intervals.push(this.tapTimes[i] - this.tapTimes[i - 1]);
-        }
-
-        const averageInterval = intervals.reduce((a, b) => a + b) / intervals.length;
-        const bpm = Math.round(60000 / averageInterval);
-
-        if (bpm >= 40 && bpm <= 220) { // Reasonable BPM range
-            this.tapBpmDisplay.textContent = `Tapped BPM: ${bpm}`;
-            this.bpmDisplay.textContent = `Detected BPM: ${bpm}`;
-            this.fixedBPM = bpm;
-        }
+        
+        this.lastTapTime = now;
     }
 
     createKick(time, velocity = 1) {
