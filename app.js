@@ -40,10 +40,12 @@ class BPMDetector {
 
         // Pattern buttons
         this.patternButtons = {
-            rock: document.getElementById('patternRock'),
-            funk: document.getElementById('patternFunk'),
-            jazz: document.getElementById('patternJazz'),
-            custom: document.getElementById('patternCustom')
+            basic: document.getElementById('pattern-basic'),
+            march: document.getElementById('pattern-march'),
+            pop: document.getElementById('pattern-pop'),
+            rock: document.getElementById('pattern-rock'),
+            dance: document.getElementById('pattern-dance'),
+            custom: document.getElementById('pattern-custom')
         };
 
         // Initialize pattern grid
@@ -128,17 +130,19 @@ class BPMDetector {
         this.currentPattern = patternId;
 
         // Update pattern info
-        document.getElementById('currentPatternName').textContent = pattern.name;
-        document.getElementById('patternDescription').textContent = pattern.description;
+        const patternNameElement = document.getElementById('currentPatternName');
+        const patternDescElement = document.getElementById('patternDescription');
+        if (patternNameElement) patternNameElement.textContent = pattern.name;
+        if (patternDescElement) patternDescElement.textContent = pattern.description;
 
         // Update grid buttons
         ['kick', 'snare', 'hihat'].forEach(instrument => {
             const grid = document.getElementById(`${instrument}Grid`);
             if (grid) {
-                const buttons = grid.getElementsByClassName('grid-button');
-                for (let i = 0; i < buttons.length; i++) {
-                    buttons[i].classList.toggle('active', pattern[instrument][i]);
-                }
+                const buttons = grid.getElementsByClassName('grid-btn');
+                Array.from(buttons).forEach((button, i) => {
+                    button.classList.toggle('active', pattern[instrument][i] === 1);
+                });
             }
         });
     }
@@ -153,21 +157,22 @@ class BPMDetector {
                 // Create 16 buttons for each instrument
                 for (let i = 0; i < 16; i++) {
                     const button = document.createElement('button');
-                    button.className = 'grid-button';
+                    button.className = 'grid-btn';
+                    button.dataset.beat = i;
                     button.addEventListener('click', () => {
                         button.classList.toggle('active');
                         if (this.currentPattern === 'custom') {
-                            this.rhythmPatterns.setCustomPattern(
-                                instrument,
-                                i,
-                                button.classList.contains('active')
-                            );
+                            this.customPattern[instrument][i] = button.classList.contains('active');
+                            this.rhythmPatterns.setCustomPattern(instrument, i, button.classList.contains('active'));
                         }
                     });
                     grid.appendChild(button);
                 }
             }
         });
+
+        // Set initial pattern
+        this.setPattern('custom');
     }
 
     playRhythm() {
@@ -184,14 +189,14 @@ class BPMDetector {
             let step = 0;
             
             // Reset current step indicators
-            document.querySelectorAll('.grid-button').forEach(btn => btn.classList.remove('current'));
+            document.querySelectorAll('.grid-btn').forEach(btn => btn.classList.remove('current'));
             
             this.rhythmInterval = setInterval(() => {
                 const currentTime = this.rhythmContext.currentTime;
                 
                 // Update current step indicator
-                document.querySelectorAll('.grid-button').forEach(btn => btn.classList.remove('current'));
-                document.querySelectorAll(`.grid-button:nth-child(${step + 1})`).forEach(btn => btn.classList.add('current'));
+                document.querySelectorAll('.grid-btn').forEach(btn => btn.classList.remove('current'));
+                document.querySelectorAll(`.grid-btn[data-beat="${step}"]`).forEach(btn => btn.classList.add('current'));
                 
                 // Play sounds for active steps
                 if (pattern.kick[step]) this.playDrumSound('kick', currentTime);
