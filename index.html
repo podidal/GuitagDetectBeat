@@ -8,6 +8,14 @@
 </head>
 <body>
     <div class="container">
+        <div class="visualization-container">
+            <canvas id="audioVisualizerWave" width="600" height="100"></canvas>
+            <canvas id="audioVisualizerEnergy" width="600" height="60"></canvas>
+            <div id="energyMeter">
+                <div id="energyBar"></div>
+                <span id="energyValue">Energy: 0</span>
+            </div>
+        </div>
         <h1>Guitar BPM Detector</h1>
         <div class="main-controls">
             <button id="startListening" class="btn">Start Listening</button>
@@ -114,13 +122,6 @@
             </div>
             
             <button id="playRhythm" class="btn">Play Rhythm</button>
-            <div class="visualization-container">
-                <canvas id="oscilloscope" width="600" height="150"></canvas>
-                <div id="volumeMeter">
-                    <div id="volumeBar"></div>
-                    <div id="peakMarker"></div>
-                </div>
-            </div>
         </div>
         <footer>
             <p>Guitar BPM Detector v1.0</p>

@@ -10,16 +10,16 @@ class BPMDetector {
         this.currentPattern = 'custom';
 
         // Visualization elements
-        this.oscilloscope = document.getElementById('oscilloscope');
-        this.oscilloscopeCtx = this.oscilloscope.getContext('2d');
-        this.volumeBar = document.getElementById('volumeBar');
-        this.peakMarker = document.getElementById('peakMarker');
+        this.waveCanvas = document.getElementById('audioVisualizerWave');
+        this.waveCtx = this.waveCanvas.getContext('2d');
+        this.energyCanvas = document.getElementById('audioVisualizerEnergy');
+        this.energyCtx = this.energyCanvas.getContext('2d');
+        this.energyBar = document.getElementById('energyBar');
+        this.energyValue = document.getElementById('energyValue');
         
-        // Visualization properties
-        this.peakEnergy = 0;
-        this.smoothedEnergy = 0;
-        this.energyHistory = new Array(100).fill(0);
-
+        // Visualization history
+        this.energyHistory = new Array(this.energyCanvas.width).fill(0);
+        
         // Custom pattern grid state
         this.customPattern = {
             kick: new Array(16).fill(false),
@@ -112,128 +112,41 @@ class BPMDetector {
             this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const source = this.audioContext.createMediaStreamSource(this.stream);
             
-            // Create analyzer nodes
-            this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 2048;
-            this.analyser.smoothingTimeConstant = 0.4;
+            // Create analyzer node with better settings for rhythm detection
+            const analyser = this.audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            analyser.smoothingTimeConstant = 0.4;
+            source.connect(analyser);
 
-            this.volumeAnalyser = this.audioContext.createAnalyser();
-            this.volumeAnalyser.fftSize = 1024;
-            this.volumeAnalyser.smoothingTimeConstant = 0.2;
-
-            // Create bandpass filter
+            // Создаем фильтр для выделения низких частот
             const filter = this.audioContext.createBiquadFilter();
             filter.type = 'bandpass';
             filter.frequency.value = 100;
             filter.Q.value = 1.0;
-
-            // Connect nodes
-            source.connect(this.analyser);
-            source.connect(this.volumeAnalyser);
+            
             source.connect(filter);
-            filter.connect(this.analyser);
+            filter.connect(analyser);
 
-            // Start visualization
-            this.drawOscilloscope();
-            this.updateVolumeMeter();
-
-            // Process audio for beat detection
-            this.processAudio();
+            // Process audio
+            this.processAudio(analyser);
         } catch (error) {
             console.error('Error accessing microphone:', error);
             alert('Error accessing microphone. Please ensure microphone permissions are granted.');
         }
     }
 
-    drawOscilloscope() {
-        if (!this.isListening) return;
-
-        const width = this.oscilloscope.width;
-        const height = this.oscilloscope.height;
-        const bufferLength = this.analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        this.analyser.getByteTimeDomainData(dataArray);
-
-        // Clear canvas
-        this.oscilloscopeCtx.fillStyle = 'rgb(0, 0, 0)';
-        this.oscilloscopeCtx.fillRect(0, 0, width, height);
-
-        // Draw waveform
-        this.oscilloscopeCtx.lineWidth = 2;
-        this.oscilloscopeCtx.strokeStyle = 'rgb(0, 255, 0)';
-        this.oscilloscopeCtx.beginPath();
-
-        const sliceWidth = width / bufferLength;
-        let x = 0;
-
-        for (let i = 0; i < bufferLength; i++) {
-            const v = dataArray[i] / 128.0;
-            const y = v * height / 2;
-
-            if (i === 0) {
-                this.oscilloscopeCtx.moveTo(x, y);
-            } else {
-                this.oscilloscopeCtx.lineTo(x, y);
-            }
-
-            x += sliceWidth;
-        }
-
-        this.oscilloscopeCtx.lineTo(width, height / 2);
-        this.oscilloscopeCtx.stroke();
-
-        requestAnimationFrame(() => this.drawOscilloscope());
-    }
-
-    updateVolumeMeter() {
-        if (!this.isListening) return;
-
-        const dataArray = new Uint8Array(this.volumeAnalyser.frequencyBinCount);
-        this.volumeAnalyser.getByteFrequencyData(dataArray);
-
-        // Calculate current volume level (RMS)
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i] * dataArray[i];
-        }
-        const rms = Math.sqrt(sum / dataArray.length);
-        const volume = Math.min(100, (rms / 128) * 100);
-
-        // Update volume history
-        this.energyHistory.push(volume);
-        this.energyHistory.shift();
-
-        // Calculate average volume
-        const avgVolume = this.energyHistory.reduce((a, b) => a + b) / this.energyHistory.length;
-
-        // Update peak marker
-        if (volume > this.peakEnergy) {
-            this.peakEnergy = volume;
-        } else {
-            this.peakEnergy = Math.max(avgVolume, this.peakEnergy * 0.95);
-        }
-
-        // Smooth the current energy value
-        this.smoothedEnergy = this.smoothedEnergy * 0.9 + volume * 0.1;
-
-        // Update visual elements
-        this.volumeBar.style.width = `${this.smoothedEnergy}%`;
-        this.peakMarker.style.right = `${100 - this.peakEnergy}%`;
-
-        requestAnimationFrame(() => this.updateVolumeMeter());
-    }
-
-    processAudio() {
-        const bufferLength = this.analyser.frequencyBinCount;
+    processAudio(analyser) {
+        const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
         const energyThreshold = 1.5;
         let lastEnergy = 0;
+        let energyHistory = [];
+        const historyLength = 10;
 
         const analyze = () => {
             if (!this.isListening) return;
 
-            this.analyser.getByteTimeDomainData(dataArray);
+            analyser.getByteTimeDomainData(dataArray);
             
             // Calculate RMS energy
             let energy = 0;
@@ -244,13 +157,13 @@ class BPMDetector {
             energy = Math.sqrt(energy / bufferLength);
 
             // Update energy history
-            this.energyHistory.push(energy);
-            if (this.energyHistory.length > 10) {
-                this.energyHistory.shift();
+            energyHistory.push(energy);
+            if (energyHistory.length > historyLength) {
+                energyHistory.shift();
             }
 
             // Calculate average energy
-            const averageEnergy = this.energyHistory.reduce((a, b) => a + b) / this.energyHistory.length;
+            const averageEnergy = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
 
             // Detect beat
             if (energy > averageEnergy * energyThreshold && 
@@ -262,10 +175,89 @@ class BPMDetector {
             }
 
             lastEnergy = energy;
+
+            // Update visualizations
+            this.drawWaveform(dataArray);
+            this.updateEnergyHistory(energy);
+            this.updateEnergyMeter(energy);
+
             requestAnimationFrame(analyze);
         };
 
         analyze();
+    }
+
+    drawWaveform(dataArray) {
+        const width = this.waveCanvas.width;
+        const height = this.waveCanvas.height;
+        const ctx = this.waveCtx;
+
+        ctx.fillStyle = 'rgb(0, 0, 0)';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgb(0, 255, 0)';
+        ctx.beginPath();
+
+        const sliceWidth = width * 1.0 / dataArray.length;
+        let x = 0;
+
+        for (let i = 0; i < dataArray.length; i++) {
+            const v = dataArray[i] / 128.0;
+            const y = v * height / 2;
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+
+            x += sliceWidth;
+        }
+
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+    }
+
+    updateEnergyHistory(energy) {
+        // Shift energy history
+        this.energyHistory.push(energy);
+        this.energyHistory.shift();
+
+        const width = this.energyCanvas.width;
+        const height = this.energyCanvas.height;
+        const ctx = this.energyCtx;
+
+        ctx.fillStyle = 'rgb(0, 0, 0)';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.beginPath();
+        ctx.moveTo(0, height);
+
+        // Draw energy history
+        for (let i = 0; i < this.energyHistory.length; i++) {
+            const x = i * (width / this.energyHistory.length);
+            const y = height - (this.energyHistory[i] * height * 3);
+            ctx.lineTo(x, y);
+        }
+
+        ctx.lineTo(width, height);
+        ctx.closePath();
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, 'rgba(255, 0, 0, 0.8)');
+        gradient.addColorStop(0.6, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(1, 'rgba(0, 255, 0, 0.8)');
+
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    }
+
+    updateEnergyMeter(energy) {
+        // Update energy bar
+        const percentage = Math.min(energy * 300, 100);
+        this.energyBar.style.width = `${percentage}%`;
+        this.energyValue.textContent = `Energy: ${energy.toFixed(3)}`;
     }
 
     beatDetected() {
