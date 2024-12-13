@@ -9,8 +9,8 @@
 <body>
     <div class="container">
         <div class="visualization-container">
-            <canvas id="audioVisualizerWave" width="600" height="100"></canvas>
-            <canvas id="audioVisualizerEnergy" width="600" height="60"></canvas>
+            <canvas id="audioVisualizerWave" width="300" height="40"></canvas>
+            <canvas id="audioVisualizerEnergy" width="300" height="30"></canvas>
             <div id="energyMeter">
                 <div id="energyBar"></div>
                 <span id="energyValue">Energy: 0</span>
@@ -21,13 +21,9 @@
         
         <div class="main-controls">
             <button id="startListening" class="btn">Start Listening</button>
-            <div id="bpmDisplay">Detected BPM: 120</div>
+            <div id="bpmDisplay">BPM: 120</div>
             <button id="fixBpm" class="btn" disabled>Fix BPM</button>
-        </div>
-
-        <div class="tap-tempo">
             <button id="tapTempo" class="btn">Tap Tempo</button>
-            <div id="tapBpmDisplay">Tapped BPM: 120</div>
         </div>
 
         <div class="rhythm-controls">

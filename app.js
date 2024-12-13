@@ -2,7 +2,7 @@ class BPMDetector {
     constructor() {
         this.audioProcessor = new AudioProcessor();
         this.isListening = false;
-        this.fixedBPM = 120;
+        this.currentBPM = 120;
         this.beatTimes = [];
         this.lastBeatTime = 0;
         this.currentPattern = 'custom';
@@ -35,7 +35,6 @@ class BPMDetector {
         this.fixBpmButton = document.getElementById('fixBpm');
         this.playRhythmButton = document.getElementById('playRhythm');
         this.tapTempoButton = document.getElementById('tapTempo');
-        this.tapBpmDisplay = document.getElementById('tapBpmDisplay');
         this.versionDisplay = document.getElementById('version');
 
         // Pattern buttons
@@ -50,13 +49,12 @@ class BPMDetector {
         this.initializePatternGrid();
 
         // Initialize displays with default BPM
-        this.bpmDisplay.textContent = `Detected BPM: ${this.fixedBPM}`;
-        this.tapBpmDisplay.textContent = `Tapped BPM: ${this.fixedBPM}`;
+        this.updateBPMDisplay(this.currentBPM);
         this.playRhythmButton.disabled = false;
         
         // Set version
         if (this.versionDisplay) {
-            this.versionDisplay.textContent = 'v1.0.1';
+            this.versionDisplay.textContent = 'v1.0.2';
         }
 
         // Set up audio processor callbacks
@@ -139,7 +137,7 @@ class BPMDetector {
                 this.isListening = true;
                 this.startButton.textContent = 'Stop Listening';
                 this.startButton.classList.add('listening');
-                this.fixedBPM = null;
+                this.currentBPM = null;
                 this.beatTimes = [];
             }
         } else {
@@ -162,15 +160,23 @@ class BPMDetector {
         this.calculateBPM();
     }
 
+    updateBPMDisplay(bpm) {
+        this.currentBPM = bpm;
+        this.bpmDisplay.textContent = `BPM: ${bpm}`;
+        
+        // Enable/disable buttons based on BPM
+        this.fixBpmButton.disabled = false;
+        this.playRhythmButton.disabled = false;
+    }
+
     calculateBPM() {
-        if (this.beatTimes.length < 4) return; // Нужно минимум 4 удара для точного расчета
+        if (this.beatTimes.length < 4) return;
 
         const intervals = [];
         for (let i = 1; i < this.beatTimes.length; i++) {
             intervals.push(this.beatTimes[i] - this.beatTimes[i - 1]);
         }
 
-        // Удаляем выбросы (интервалы, сильно отличающиеся от среднего)
         const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
         const filteredIntervals = intervals.filter(interval => 
             Math.abs(interval - avgInterval) < avgInterval * 0.5
@@ -181,15 +187,12 @@ class BPMDetector {
         const cleanAvgInterval = filteredIntervals.reduce((a, b) => a + b) / filteredIntervals.length;
         let bpm = Math.round(60000 / cleanAvgInterval);
 
-        // Корректируем BPM в разумных пределах
+        // Keep BPM in reasonable range
         if (bpm < 60) bpm *= 2;
         if (bpm > 200) bpm = Math.round(bpm / 2);
 
-        // Проверяем, что BPM в разумных пределах
         if (bpm >= 40 && bpm <= 220) {
-            this.bpmDisplay.textContent = `Detected BPM: ${bpm}`;
-            this.fixedBPM = bpm;
-            this.fixBpmButton.disabled = false;
+            this.updateBPMDisplay(bpm);
         }
     }
 
@@ -199,12 +202,12 @@ class BPMDetector {
         const ctx = this.waveCtx;
 
         // Clear previous frame
-        ctx.fillStyle = 'rgb(0, 0, 0)';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, width, height);
 
         // Draw new frame
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgb(0, 255, 0)';
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = 'var(--primary-color)';
         ctx.beginPath();
 
         const sliceWidth = width * 1.0 / dataArray.length;
@@ -212,7 +215,7 @@ class BPMDetector {
 
         for (let i = 0; i < dataArray.length; i++) {
             const v = dataArray[i] / 128.0;
-            const y = (v * height / 2) + height / 2; // Center the waveform
+            const y = (v * height / 2) + height / 2;
 
             if (i === 0) {
                 ctx.moveTo(x, y);
@@ -228,7 +231,6 @@ class BPMDetector {
     }
 
     updateEnergyHistory(energy) {
-        // Shift energy history
         this.energyHistory.push(energy);
         this.energyHistory.shift();
 
@@ -237,19 +239,18 @@ class BPMDetector {
         const ctx = this.energyCtx;
 
         // Clear canvas
-        ctx.fillStyle = 'rgb(0, 0, 0)';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, width, height);
 
         // Draw energy history with gradient
         const gradient = ctx.createLinearGradient(0, height, 0, 0);
-        gradient.addColorStop(0, '#4CAF50');   // Green
-        gradient.addColorStop(0.6, '#FFC107'); // Yellow
-        gradient.addColorStop(1, '#F44336');   // Red
+        gradient.addColorStop(0, 'var(--primary-color)');
+        gradient.addColorStop(0.6, '#FFB74D');
+        gradient.addColorStop(1, '#FF7043');
 
         ctx.beginPath();
         ctx.moveTo(0, height);
 
-        // Draw smooth energy curve
         for (let i = 0; i < this.energyHistory.length; i++) {
             const x = (i / (this.energyHistory.length - 1)) * width;
             const normalizedEnergy = Math.min(this.energyHistory[i] * 3, 1);
@@ -258,7 +259,6 @@ class BPMDetector {
             if (i === 0) {
                 ctx.moveTo(x, y);
             } else {
-                // Use quadratic curves for smoother visualization
                 const prevX = ((i - 1) / (this.energyHistory.length - 1)) * width;
                 const prevY = height - (Math.min(this.energyHistory[i - 1] * 3, 1) * height);
                 const cpX = (x + prevX) / 2;
@@ -272,13 +272,13 @@ class BPMDetector {
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // Add grid lines
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        // Add subtle grid lines
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.03)';
         ctx.lineWidth = 1;
         
         // Horizontal grid lines
-        for (let i = 0; i <= 4; i++) {
-            const y = (height * i) / 4;
+        for (let i = 0; i <= 2; i++) {
+            const y = (height * i) / 2;
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(width, y);
@@ -286,8 +286,8 @@ class BPMDetector {
         }
         
         // Vertical grid lines
-        for (let i = 0; i <= 8; i++) {
-            const x = (width * i) / 8;
+        for (let i = 0; i <= 4; i++) {
+            const x = (width * i) / 4;
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, height);
@@ -307,20 +307,16 @@ class BPMDetector {
         
         // Update color based on energy level
         if (percentage > 80) {
-            this.energyBar.style.backgroundColor = '#F44336'; // Red
+            this.energyBar.style.backgroundColor = '#FF7043'; // Red
         } else if (percentage > 50) {
-            this.energyBar.style.backgroundColor = '#FFC107'; // Yellow
+            this.energyBar.style.backgroundColor = '#FFB74D'; // Yellow
         } else {
-            this.energyBar.style.backgroundColor = '#4CAF50'; // Green
+            this.energyBar.style.backgroundColor = 'var(--primary-color)'; // Green
         }
     }
 
     fixBPM() {
-        // Get BPM from either tapped or detected value
-        const bpmText = this.tapTimes.length > 0 ? 
-            this.tapBpmDisplay.textContent : 
-            this.bpmDisplay.textContent;
-        this.fixedBPM = parseInt(bpmText.match(/\d+/)[0]);
+        this.updateBPMDisplay(this.currentBPM);
         this.isListening = false;
         this.startButton.textContent = 'Start Listening';
         this.startButton.classList.remove('listening');
@@ -350,11 +346,14 @@ class BPMDetector {
             }
             
             const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
-            const bpm = Math.round(60000 / avgInterval);
+            let bpm = Math.round(60000 / avgInterval);
+            
+            // Keep BPM in reasonable range
+            if (bpm < 60) bpm *= 2;
+            if (bpm > 200) bpm = Math.round(bpm / 2);
             
             if (bpm >= 40 && bpm <= 220) {
-                this.fixedBPM = bpm;
-                this.tapBpmDisplay.textContent = `Tapped BPM: ${bpm}`;
+                this.updateBPMDisplay(bpm);
             }
         }
         
@@ -471,7 +470,7 @@ class BPMDetector {
         if (this.currentPattern === 'custom') {
             // For custom pattern, we divide each beat into 4 sixteenth notes
             for (let i = 0; i < 4; i++) {
-                const subBeatTime = time + (i * (60 / this.fixedBPM) / 4);
+                const subBeatTime = time + (i * (60 / this.currentBPM) / 4);
                 this.createCustomPattern(subBeatTime, beatNumber, i);
             }
         } else {
@@ -493,7 +492,7 @@ class BPMDetector {
         if (isLastBar && beatNumber === 3) {
             // Fill on the last beat of bar 4
             for (let i = 0; i < 4; i++) {
-                this.createSnare(time + (i * 0.25 * (60 / this.fixedBPM)), 0.7 - (i * 0.1));
+                this.createSnare(time + (i * 0.25 * (60 / this.currentBPM)), 0.7 - (i * 0.1));
             }
         } else {
             // Basic rock pattern
@@ -514,7 +513,7 @@ class BPMDetector {
             // Syncopated fill on last two beats of bar 4
             const divisions = 3;
             for (let i = 0; i < divisions; i++) {
-                this.createSnare(time + (i * (60 / this.fixedBPM) / divisions), 0.7);
+                this.createSnare(time + (i * (60 / this.currentBPM) / divisions), 0.7);
             }
         } else {
             // Funk pattern with syncopated kicks
@@ -524,13 +523,13 @@ class BPMDetector {
                 this.createKick(time, 1.2);
             } else if (beatNumber === 1) {
                 this.createSnare(time, 0.8);
-                this.createKick(time + (60 / this.fixedBPM) / 2, 0.9); // "and" of 2
+                this.createKick(time + (60 / this.currentBPM) / 2, 0.9); // "and" of 2
             } else if (beatNumber === 2) {
                 this.createKick(time, 1);
             } else {
                 this.createSnare(time, 0.9);
                 if (!isLastBar) {
-                    this.createKick(time + (60 / this.fixedBPM) / 2, 0.9); // "and" of 4
+                    this.createKick(time + (60 / this.currentBPM) / 2, 0.9); // "and" of 4
                 }
             }
         }
@@ -543,7 +542,7 @@ class BPMDetector {
             for (let i = 0; i < divisions; i++) {
                 const swingOffset = i % 2 === 1 ? 0.33 : 0;
                 this.createSnare(
-                    time + (i * (60 / this.fixedBPM) / divisions) + swingOffset,
+                    time + (i * (60 / this.currentBPM) / divisions) + swingOffset,
                     0.6 + (i * 0.1)
                 );
             }
@@ -560,7 +559,7 @@ class BPMDetector {
             
             // Add swing eighth notes on the ride
             if (!isLastBar) {
-                this.createHihat(time + (60 / this.fixedBPM) / 3, false);
+                this.createHihat(time + (60 / this.currentBPM) / 3, false);
             }
         }
     }
@@ -592,7 +591,7 @@ class BPMDetector {
                 while (lastScheduledTime < currentTime + 0.5) {
                     const barCount = Math.floor(beatCount / 4);
                     this.createBeats(lastScheduledTime, beatCount % 4, barCount);
-                    lastScheduledTime += 60 / this.fixedBPM;
+                    lastScheduledTime += 60 / this.currentBPM;
                     beatCount++;
                 }
             };
