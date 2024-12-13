@@ -19,6 +19,7 @@ body {
     background-color: white;
     border-radius: 10px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding-bottom: 40px; /* Add space for footer */
 }
 
 h1 {
@@ -38,10 +39,11 @@ h1 {
     padding: 2rem;
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    margin-bottom: 20px;
 }
 
 .main-controls,
-.tap-tempo,
 .rhythm-controls {
     margin-bottom: 20px;
     padding: 15px;
@@ -74,20 +76,24 @@ h1 {
     background-color: #2196F3;
 }
 
-.tap-btn {
-    background-color: #27ae60;
+.bpm-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    justify-content: center;
 }
 
-.tap-btn:hover {
-    background-color: #219a52;
+.bpm-input {
+    width: 80px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+    text-align: center;
 }
 
-.tap-btn.active {
-    background-color: #e67e22;
-}
-
-.tap-bpm {
-    color: #27ae60;
+#tapBpm {
+    min-width: 100px;
 }
 
 .bpm-display {
@@ -196,66 +202,74 @@ h1 {
 }
 
 .visualization-container {
-    background-color: #f5f5f5;
-    padding: 8px;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    width: 100%;
-    max-width: 320px;
-    margin-left: auto;
-    margin-right: auto;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background-color: #fff;
+    border-radius: 3px;
+    padding: 3px;
+    width: 110px;
 }
 
 #audioVisualizerWave, 
 #audioVisualizerEnergy {
     width: 100%;
-    background-color: #ffffff;
-    border-radius: 4px;
-    margin-bottom: 6px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    background-color: #f9f9f9;
+    border-radius: 2px;
+    margin-bottom: 1px;
 }
 
 #energyMeter {
-    height: 20px;
-    background-color: #ffffff;
-    border-radius: 4px;
-    position: relative;
+    height: 8px;
+    background-color: #eee;
+    border-radius: 2px;
     overflow: hidden;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    position: relative;
+    margin-top: 1px;
 }
 
 #energyBar {
     height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, 
-        var(--primary-color) 0%, 
-        var(--primary-color) 40%, 
-        #FFB74D 40%, 
-        #FFB74D 80%, 
-        #FF7043 80%, 
-        #FF7043 100%
-    );
-    transition: width 0.1s ease-out;
+    width: 0;
+    background-color: #4CAF50;
+    transition: width 0.1s ease;
 }
 
 #energyValue {
     position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 7px;
+    line-height: 8px;
     color: #333;
-    font-family: monospace;
-    font-size: 11px;
-    z-index: 1;
+}
+
+.top-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
 }
 
 footer {
-    margin-top: auto;
-    padding: 1rem;
-    text-align: center;
-    color: #7f8c8d;
-    font-size: 0.8rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #f5f5f5;
+    padding: 5px;
+    border-top: 1px solid #ddd;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 10px;
+}
+
+.version {
+    font-size: 12px;
+    color: #666;
 }
 
 #version {

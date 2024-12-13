@@ -8,22 +8,24 @@
 </head>
 <body>
     <div class="container">
-        <div class="visualization-container">
-            <canvas id="audioVisualizerWave" width="300" height="40"></canvas>
-            <canvas id="audioVisualizerEnergy" width="300" height="30"></canvas>
-            <div id="energyMeter">
-                <div id="energyBar"></div>
-                <span id="energyValue">Energy: 0</span>
-            </div>
-        </div>
-        
         <h1>Guitar BPM Detector</h1>
         
         <div class="main-controls">
+            <div class="visualization-container">
+                <canvas id="audioVisualizerWave" width="100" height="15"></canvas>
+                <canvas id="audioVisualizerEnergy" width="100" height="10"></canvas>
+                <div id="energyMeter">
+                    <div id="energyBar"></div>
+                    <span id="energyValue">Energy: 0</span>
+                </div>
+            </div>
             <button id="startListening" class="btn">Start Listening</button>
-            <div id="bpmDisplay">BPM: 120</div>
+            <div id="bpmDisplay">Detected BPM: 90</div>
             <button id="fixBpm" class="btn" disabled>Fix BPM</button>
-            <button id="tapTempo" class="btn">Tap Tempo</button>
+            <div class="bpm-controls">
+                <input type="number" id="manualBpm" min="30" max="300" value="90" class="bpm-input">
+                <button id="tapBpm" class="btn">Tap BPM</button>
+            </div>
         </div>
 
         <div class="rhythm-controls">
@@ -59,7 +61,10 @@
     </div>
 
     <footer>
-        <span id="version"></span>
+        <div class="footer-content">
+            <div class="version">v1.2.0</div>
+            
+        </div>
     </footer>
 
     <script src="audioProcessor.js"></script>
