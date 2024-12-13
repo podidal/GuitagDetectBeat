@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar BPM Detector</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Guitar BPM Detector</h1>
+        <div class="main-controls">
+            <button id="startListening" class="btn">Start Listening</button>
+            <div id="bpmDisplay" class="bpm-display">Detected BPM: 120</div>
+            <button id="tapTempo" class="btn tap-btn">Tap Tempo</button>
+            <div id="tapBpmDisplay" class="bpm-display tap-bpm">Tapped BPM: 120</div>
+            <button id="fixBpm" class="btn">Fix BPM</button>
+            
+            <div class="pattern-selector">
+                <h3>Drum Patterns</h3>
+                <div class="pattern-buttons">
+                    <button id="patternRock" class="btn pattern-btn">Rock</button>
+                    <button id="patternFunk" class="btn pattern-btn">Funk</button>
+                    <button id="patternJazz" class="btn pattern-btn">Jazz</button>
+                    <button id="patternCustom" class="btn pattern-btn active">Custom</button>
+                </div>
+            </div>
+
+            <div class="pattern-editor">
+                <h3>Pattern Editor</h3>
+                <div class="pattern-grid">
+                    <div class="instrument-row">
+                        <div class="instrument-label">Kick</div>
+                        <div class="beat-buttons" id="kickGrid">
+                            <button class="grid-btn" data-beat="0"></button>
+                            <button class="grid-btn" data-beat="1"></button>
+                            <button class="grid-btn" data-beat="2"></button>
+                            <button class="grid-btn" data-beat="3"></button>
+                            <button class="grid-btn" data-beat="4"></button>
+                            <button class="grid-btn" data-beat="5"></button>
+                            <button class="grid-btn" data-beat="6"></button>
+                            <button class="grid-btn" data-beat="7"></button>
+                            <button class="grid-btn" data-beat="8"></button>
+                            <button class="grid-btn" data-beat="9"></button>
+                            <button class="grid-btn" data-beat="10"></button>
+                            <button class="grid-btn" data-beat="11"></button>
+                            <button class="grid-btn" data-beat="12"></button>
+                            <button class="grid-btn" data-beat="13"></button>
+                            <button class="grid-btn" data-beat="14"></button>
+                            <button class="grid-btn" data-beat="15"></button>
+                        </div>
+                    </div>
+                    <div class="instrument-row">
+                        <div class="instrument-label">Snare</div>
+                        <div class="beat-buttons" id="snareGrid">
+                            <button class="grid-btn" data-beat="0"></button>
+                            <button class="grid-btn" data-beat="1"></button>
+                            <button class="grid-btn" data-beat="2"></button>
+                            <button class="grid-btn" data-beat="3"></button>
+                            <button class="grid-btn" data-beat="4"></button>
+                            <button class="grid-btn" data-beat="5"></button>
+                            <button class="grid-btn" data-beat="6"></button>
+                            <button class="grid-btn" data-beat="7"></button>
+                            <button class="grid-btn" data-beat="8"></button>
+                            <button class="grid-btn" data-beat="9"></button>
+                            <button class="grid-btn" data-beat="10"></button>
+                            <button class="grid-btn" data-beat="11"></button>
+                            <button class="grid-btn" data-beat="12"></button>
+                            <button class="grid-btn" data-beat="13"></button>
+                            <button class="grid-btn" data-beat="14"></button>
+                            <button class="grid-btn" data-beat="15"></button>
+                        </div>
+                    </div>
+                    <div class="instrument-row">
+                        <div class="instrument-label">Hi-hat</div>
+                        <div class="beat-buttons" id="hihatGrid">
+                            <button class="grid-btn" data-beat="0"></button>
+                            <button class="grid-btn" data-beat="1"></button>
+                            <button class="grid-btn" data-beat="2"></button>
+                            <button class="grid-btn" data-beat="3"></button>
+                            <button class="grid-btn" data-beat="4"></button>
+                            <button class="grid-btn" data-beat="5"></button>
+                            <button class="grid-btn" data-beat="6"></button>
+                            <button class="grid-btn" data-beat="7"></button>
+                            <button class="grid-btn" data-beat="8"></button>
+                            <button class="grid-btn" data-beat="9"></button>
+                            <button class="grid-btn" data-beat="10"></button>
+                            <button class="grid-btn" data-beat="11"></button>
+                            <button class="grid-btn" data-beat="12"></button>
+                            <button class="grid-btn" data-beat="13"></button>
+                            <button class="grid-btn" data-beat="14"></button>
+                            <button class="grid-btn" data-beat="15"></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="beat-markers">
+                    <div>1</div>
+                    <div>e</div>
+                    <div>&</div>
+                    <div>a</div>
+                    <div>2</div>
+                    <div>e</div>
+                    <div>&</div>
+                    <div>a</div>
+                    <div>3</div>
+                    <div>e</div>
+                    <div>&</div>
+                    <div>a</div>
+                    <div>4</div>
+                    <div>e</div>
+                    <div>&</div>
+                    <div>a</div>
+                </div>
+            </div>
+            
+            <button id="playRhythm" class="btn">Play Rhythm</button>
+        </div>
+        <footer>
+            <p>Guitar BPM Detector v1.0</p>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
