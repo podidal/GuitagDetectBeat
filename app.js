@@ -45,7 +45,8 @@ class BPMDetector {
             pop: document.getElementById('pattern-pop'),
             rock: document.getElementById('pattern-rock'),
             dance: document.getElementById('pattern-dance'),
-            custom: document.getElementById('pattern-custom')
+            custom: document.getElementById('pattern-custom'),
+            random: document.getElementById('pattern-random')
         };
 
         // Initialize pattern grid
@@ -125,6 +126,11 @@ class BPMDetector {
             selectedButton.classList.add('active');
         }
 
+        // Generate new random pattern if random is selected
+        if (patternId === 'random') {
+            this.rhythmPatterns.generateRandomPattern();
+        }
+
         // Get the pattern
         const pattern = this.rhythmPatterns.getPattern(patternId);
         this.currentPattern = patternId;
@@ -141,10 +147,16 @@ class BPMDetector {
             if (grid) {
                 const buttons = grid.getElementsByClassName('grid-btn');
                 Array.from(buttons).forEach((button, i) => {
-                    button.classList.toggle('active', pattern[instrument][i] === 1);
+                    const isActive = pattern[instrument][i] === 1 || pattern[instrument][i] === true;
+                    button.classList.toggle('active', isActive);
                 });
             }
         });
+
+        // If rhythm is playing, continue with new pattern
+        if (this.isPlayingRhythm) {
+            this.updateCurrentStepDisplay();
+        }
     }
 
     initializePatternGrid() {
@@ -161,9 +173,28 @@ class BPMDetector {
                     button.dataset.beat = i;
                     button.addEventListener('click', () => {
                         button.classList.toggle('active');
+                        // Update pattern immediately
+                        const isActive = button.classList.contains('active');
                         if (this.currentPattern === 'custom') {
-                            this.customPattern[instrument][i] = button.classList.contains('active');
-                            this.rhythmPatterns.setCustomPattern(instrument, i, button.classList.contains('active'));
+                            this.customPattern[instrument][i] = isActive;
+                            this.rhythmPatterns.setCustomPattern(instrument, i, isActive);
+                        } else {
+                            // If we're not in custom pattern, switch to custom and copy current pattern
+                            const currentPattern = this.rhythmPatterns.getPattern(this.currentPattern);
+                            Object.keys(this.customPattern).forEach(inst => {
+                                this.customPattern[inst] = [...currentPattern[inst]];
+                            });
+                            this.customPattern[instrument][i] = isActive;
+                            
+                            // Update the custom pattern in rhythmPatterns
+                            Object.keys(this.customPattern).forEach(inst => {
+                                for (let j = 0; j < 16; j++) {
+                                    this.rhythmPatterns.setCustomPattern(inst, j, this.customPattern[inst][j]);
+                                }
+                            });
+                            
+                            // Switch to custom pattern
+                            this.setPattern('custom');
                         }
                     });
                     grid.appendChild(button);
@@ -172,7 +203,7 @@ class BPMDetector {
         });
 
         // Set initial pattern
-        this.setPattern('custom');
+        this.setPattern(this.currentPattern);
     }
 
     playRhythm() {
@@ -181,7 +212,6 @@ class BPMDetector {
                 this.rhythmContext = new AudioContext();
             }
             
-            const pattern = this.rhythmPatterns.getPattern(this.currentPattern);
             const bpm = this.fixedBPM;
             const secondsPerBeat = 60.0 / bpm;
             const secondsPerStep = secondsPerBeat / 4; // 16th notes
@@ -189,19 +219,19 @@ class BPMDetector {
             let step = 0;
             
             // Reset current step indicators
-            document.querySelectorAll('.grid-btn').forEach(btn => btn.classList.remove('current'));
+            this.updateCurrentStepDisplay(step);
             
             this.rhythmInterval = setInterval(() => {
                 const currentTime = this.rhythmContext.currentTime;
-                
-                // Update current step indicator
-                document.querySelectorAll('.grid-btn').forEach(btn => btn.classList.remove('current'));
-                document.querySelectorAll(`.grid-btn[data-beat="${step}"]`).forEach(btn => btn.classList.add('current'));
+                const pattern = this.rhythmPatterns.getPattern(this.currentPattern); // Get current pattern each step
                 
                 // Play sounds for active steps
                 if (pattern.kick[step]) this.playDrumSound('kick', currentTime);
                 if (pattern.snare[step]) this.playDrumSound('snare', currentTime);
                 if (pattern.hihat[step]) this.playDrumSound('hihat', currentTime);
+                
+                // Update current step indicator
+                this.updateCurrentStepDisplay(step);
                 
                 step = (step + 1) % 16;
             }, secondsPerStep * 1000);
@@ -210,6 +240,31 @@ class BPMDetector {
             this.playRhythmButton.textContent = 'Stop';
         } else {
             this.stopRhythm();
+        }
+    }
+
+    stopRhythm() {
+        if (this.rhythmInterval) {
+            clearInterval(this.rhythmInterval);
+            this.rhythmInterval = null;
+        }
+        this.isPlayingRhythm = false;
+        this.playRhythmButton.textContent = 'Play Rhythm';
+        // Clear current step indicator
+        this.updateCurrentStepDisplay(-1);
+    }
+
+    updateCurrentStepDisplay(currentStep) {
+        // First remove current class from all buttons
+        document.querySelectorAll('.grid-btn').forEach(btn => {
+            btn.classList.remove('current');
+        });
+
+        // If we have a valid step, add current class to those buttons
+        if (currentStep >= 0 && currentStep < 16) {
+            document.querySelectorAll(`.grid-btn[data-beat="${currentStep}"]`).forEach(btn => {
+                btn.classList.add('current');
+            });
         }
     }
 
@@ -405,60 +460,76 @@ class BPMDetector {
     }
 
     createKick(time, velocity = 1) {
-        const oscillator = this.rhythmContext.createOscillator();
-        const gainNode = this.rhythmContext.createGain();
-        const filter = this.rhythmContext.createBiquadFilter();
+        const osc = this.rhythmContext.createOscillator();
+        const gain = this.rhythmContext.createGain();
         
-        filter.type = 'lowpass';
-        filter.frequency.value = 200;
-        
-        oscillator.connect(filter);
-        filter.connect(gainNode);
-        gainNode.connect(this.rhythmContext.destination);
-        
-        oscillator.frequency.setValueAtTime(160, time);
-        gainNode.gain.setValueAtTime(velocity, time);
-        
-        oscillator.frequency.exponentialRampToValueAtTime(55, time + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
-        
-        oscillator.start(time);
-        oscillator.stop(time + 0.15);
-    }
-
-    createHihat(time, isAccent) {
-        const noise = this.rhythmContext.createBufferSource();
-        const gainNode = this.rhythmContext.createGain();
-        const filter = this.rhythmContext.createBiquadFilter();
-        
-        const bufferSize = this.rhythmContext.sampleRate * 0.1;
-        const buffer = this.rhythmContext.createBuffer(1, bufferSize, this.rhythmContext.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
+        // Increase velocity for the first beat
+        if (time === this.rhythmContext.currentTime) {
+            velocity *= 1.2;
         }
+
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
         
-        filter.type = 'highpass';
-        filter.frequency.value = 7000;
+        gain.gain.setValueAtTime(velocity, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
         
-        noise.buffer = buffer;
-        noise.connect(filter);
-        filter.connect(gainNode);
-        gainNode.connect(this.rhythmContext.destination);
+        osc.connect(gain);
+        gain.connect(this.rhythmContext.destination);
         
-        gainNode.gain.setValueAtTime(isAccent ? 0.4 : 0.1, time);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
-        
-        noise.start(time);
-        noise.stop(time + 0.05);
+        osc.start(time);
+        osc.stop(time + 0.5);
     }
 
     createSnare(time, velocity = 0.8) {
-        // Noise component
         const noise = this.rhythmContext.createBufferSource();
         const noiseGain = this.rhythmContext.createGain();
-        const noiseFilter = this.rhythmContext.createBiquadFilter();
+        const osc = this.rhythmContext.createOscillator();
+        const oscGain = this.rhythmContext.createGain();
         
+        // Increase velocity for the first beat
+        if (time === this.rhythmContext.currentTime) {
+            velocity *= 1.2;
+        }
+
+        // Create and fill noise buffer
+        const bufferSize = this.rhythmContext.sampleRate * 0.5;
+        const buffer = this.rhythmContext.createBuffer(1, bufferSize, this.rhythmContext.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        
+        noise.buffer = buffer;
+        
+        noiseGain.gain.setValueAtTime(velocity, time);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+        
+        oscGain.gain.setValueAtTime(velocity * 3, time);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+        
+        osc.frequency.setValueAtTime(100, time);
+        
+        noise.connect(noiseGain);
+        osc.connect(oscGain);
+        noiseGain.connect(this.rhythmContext.destination);
+        oscGain.connect(this.rhythmContext.destination);
+        
+        noise.start(time);
+        osc.start(time);
+        osc.stop(time + 0.2);
+    }
+
+    createHihat(time, velocity = 0.6) {
+        const noise = this.rhythmContext.createBufferSource();
+        const noiseGain = this.rhythmContext.createGain();
+        
+        // Increase velocity for the first beat
+        if (time === this.rhythmContext.currentTime) {
+            velocity *= 1.2;
+        }
+
+        // Create and fill noise buffer
         const bufferSize = this.rhythmContext.sampleRate * 0.1;
         const buffer = this.rhythmContext.createBuffer(1, bufferSize, this.rhythmContext.sampleRate);
         const data = buffer.getChannelData(0);
@@ -466,46 +537,35 @@ class BPMDetector {
             data[i] = Math.random() * 2 - 1;
         }
         
-        noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.value = 1000;
-        noiseFilter.Q.value = 1;
-        
         noise.buffer = buffer;
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(this.rhythmContext.destination);
         
-        noiseGain.gain.setValueAtTime(velocity * 0.5, time);
+        const filter = this.rhythmContext.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 7000;
+        
+        noiseGain.gain.setValueAtTime(velocity * 0.8, time);
         noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
         
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.rhythmContext.destination);
+        
         noise.start(time);
-        noise.stop(time + 0.1);
-
-        // Tone component
-        const osc = this.rhythmContext.createOscillator();
-        const oscGain = this.rhythmContext.createGain();
-        
-        osc.connect(oscGain);
-        oscGain.connect(this.rhythmContext.destination);
-        
-        osc.frequency.setValueAtTime(250, time);
-        oscGain.gain.setValueAtTime(velocity * 0.5, time);
-        oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
-        
-        osc.start(time);
-        osc.stop(time + 0.1);
     }
 
     playDrumSound(instrument, time) {
-        switch (instrument) {
+        const isFirstBeat = time === this.rhythmContext.currentTime;
+        const velocity = isFirstBeat ? 1.2 : 1;
+
+        switch(instrument) {
             case 'kick':
-                this.createKick(time);
+                this.createKick(time, velocity);
                 break;
             case 'snare':
-                this.createSnare(time);
+                this.createSnare(time, velocity * 0.8);
                 break;
             case 'hihat':
-                this.createHihat(time);
+                this.createHihat(time, velocity * 0.6);
                 break;
         }
     }
@@ -555,18 +615,6 @@ class BPMDetector {
                 this.manualBpmInput.value = this.fixedBPM;
             }
         }
-    }
-
-    stopRhythm() {
-        if (this.rhythmInterval) {
-            clearInterval(this.rhythmInterval);
-        }
-        if (this.rhythmContext) {
-            this.rhythmContext.close();
-            this.rhythmContext = null;
-        }
-        this.isPlayingRhythm = false;
-        this.playRhythmButton.textContent = 'Play';
     }
 }
 
