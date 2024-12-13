@@ -22,6 +22,7 @@
     padding: 0;
     box-sizing: border-box;
     transition: all 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 body {
@@ -29,9 +30,16 @@ body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.6;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
     justify-content: center;
     align-items: center;
     padding: 20px;
@@ -45,7 +53,15 @@ body {
     box-shadow: 
         0 10px 25px var(--shadow-light), 
         0 5px 15px var(--shadow-medium);
+    width: 100%;
+    max-width: 800px;
+    background-color: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    box-shadow: 
+        0 10px 25px var(--shadow-light), 
+        0 5px 15px var(--shadow-medium);
     padding: 30px;
+    overflow: hidden;
     overflow: hidden;
 }
 
@@ -76,7 +92,36 @@ h1 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    color: var(--text-primary);
+    margin-bottom: 25px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.main-controls, 
+.rhythm-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    background-color: var(--bg-primary);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: 
+        inset 0 2px 4px var(--shadow-light),
+        0 2px 4px var(--shadow-medium);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 12px 24px;
+    border: none;
+    border-radius: calc(var(--border-radius) / 2);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
     border: none;
     border-radius: calc(var(--border-radius) / 2);
     background-color: var(--bg-secondary);
@@ -86,20 +131,33 @@ h1 {
     box-shadow: 
         0 4px 6px var(--shadow-light), 
         0 2px 4px var(--shadow-medium);
+    cursor: pointer;
+    box-shadow: 
+        0 4px 6px var(--shadow-light), 
+        0 2px 4px var(--shadow-medium);
     text-transform: uppercase;
+    letter-spacing: 0.5px;
     letter-spacing: 0.5px;
     transition: all 0.3s ease;
 }
 
 .btn:hover {
+.btn:hover {
     transform: translateY(-2px);
+    box-shadow: 
+        0 6px 8px var(--shadow-light), 
+        0 4px 6px var(--shadow-medium);
     box-shadow: 
         0 6px 8px var(--shadow-light), 
         0 4px 6px var(--shadow-medium);
 }
 
 .btn:active {
+.btn:active {
     transform: translateY(1px);
+    box-shadow: 
+        0 2px 4px var(--shadow-light), 
+        0 1px 2px var(--shadow-medium);
     box-shadow: 
         0 2px 4px var(--shadow-light), 
         0 1px 2px var(--shadow-medium);
@@ -108,8 +166,16 @@ h1 {
 .btn.active {
     background-color: var(--accent-primary);
     color: white;
+.btn.active {
+    background-color: var(--accent-primary);
+    color: white;
 }
 
+.pattern-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
 .pattern-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -121,9 +187,16 @@ h1 {
     display: flex;
     gap: 8px;
     justify-content: center;
+    gap: 8px;
+    justify-content: center;
 }
 
 .grid-btn {
+    width: 30px;
+    height: 30px;
+    border: 2px solid transparent;
+    background-color: var(--bg-primary);
+    border-radius: 6px;
     width: 30px;
     height: 30px;
     border: 2px solid transparent;
@@ -134,9 +207,14 @@ h1 {
         inset 0 2px 4px var(--shadow-light),
         0 2px 4px var(--shadow-medium);
     transition: all 0.3s ease;
+    box-shadow: 
+        inset 0 2px 4px var(--shadow-light),
+        0 2px 4px var(--shadow-medium);
+    transition: all 0.3s ease;
 }
 
 .grid-btn:hover {
+    transform: scale(1.05);
     transform: scale(1.05);
 }
 
@@ -146,9 +224,20 @@ h1 {
     box-shadow: 
         0 4px 6px var(--shadow-light), 
         0 2px 4px var(--shadow-medium);
+    background-color: var(--accent-primary);
+    color: white;
+    box-shadow: 
+        0 4px 6px var(--shadow-light), 
+        0 2px 4px var(--shadow-medium);
 }
 
 .grid-btn.current {
+    border-color: var(--accent-secondary);
+    box-shadow: 
+        0 0 10px rgba(52, 152, 219, 0.5),
+        inset 0 2px 4px var(--shadow-light);
+}
+
     border-color: var(--accent-secondary);
     box-shadow: 
         0 0 10px rgba(52, 152, 219, 0.5),
@@ -165,11 +254,22 @@ h1 {
     box-shadow: 
         inset 0 2px 4px var(--shadow-light),
         0 2px 4px var(--shadow-medium);
+    margin: 10px 0;
+    padding: 10px;
+    background-color: var(--bg-primary);
+    border-radius: var(--border-radius);
+    box-shadow: 
+        inset 0 2px 4px var(--shadow-light),
+        0 2px 4px var(--shadow-medium);
 }
 
 .instrument-label {
     width: 80px;
+    width: 80px;
     text-align: right;
+    margin-right: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
     margin-right: 15px;
     font-weight: 600;
     color: var(--text-secondary);
@@ -180,15 +280,30 @@ h1 {
     flex-direction: column;
     align-items: center;
     gap: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 20px;
+    background-color: var(--bg-primary);
+    border-radius: var(--border-radius);
     background-color: var(--bg-primary);
     border-radius: var(--border-radius);
     padding: 15px;
     box-shadow: 
         inset 0 2px 4px var(--shadow-light),
         0 2px 4px var(--shadow-medium);
+    box-shadow: 
+        inset 0 2px 4px var(--shadow-light),
+        0 2px 4px var(--shadow-medium);
 }
 
+canvas {
+    border-radius: 8px;
+    background-color: var(--bg-secondary);
+    box-shadow: 
+        inset 0 2px 4px var(--shadow-light),
+        0 2px 4px var(--shadow-medium);
 canvas {
     border-radius: 8px;
     background-color: var(--bg-secondary);
@@ -206,16 +321,29 @@ canvas {
     box-shadow: 
         inset 0 2px 4px var(--shadow-light),
         0 2px 4px var(--shadow-medium);
+#energyMeter {
+    width: 100%;
+    height: 15px;
+    background-color: var(--bg-secondary);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 
+        inset 0 2px 4px var(--shadow-light),
+        0 2px 4px var(--shadow-medium);
 }
 
 #energyBar {
     height: 100%;
     background-color: var(--accent-primary);
+    background-color: var(--accent-primary);
     width: 0;
+    border-radius: 10px;
+    transition: width 0.3s ease;
     border-radius: 10px;
     transition: width 0.3s ease;
 }
 
+.bpm-controls {
 .bpm-controls {
     display: flex;
     gap: 10px;
@@ -344,7 +472,10 @@ footer {
 
 /* Responsive Design */
 @media screen and (max-width: 600px) {
+@media screen and (max-width: 600px) {
     .container {
+        width: 95%;
+        padding: 15px;
         width: 95%;
         padding: 15px;
     }
@@ -352,13 +483,19 @@ footer {
     .pattern-buttons {
         flex-direction: column;
         align-items: stretch;
+        align-items: stretch;
     }
 
     .btn {
         width: 100%;
+    .btn {
+        width: 100%;
     }
 
+
     .grid-btn {
+        width: 25px;
+        height: 25px;
         width: 25px;
         height: 25px;
     }
@@ -366,9 +503,16 @@ footer {
     .instrument-row {
         flex-direction: column;
         align-items: stretch;
+    .instrument-row {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .instrument-label {
+        text-align: center;
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
         text-align: center;
         margin-right: 0;
         margin-bottom: 10px;

@@ -8,32 +8,34 @@
 </head>
 <body>
     <div class="container">
-        <h1>Guitar BPM Detector</h1>
-        
-        <div class="main-controls">
-            <div class="visualization-container">
-                <canvas id="audioVisualizerWave" width="100" height="15"></canvas>
-                <canvas id="audioVisualizerEnergy" width="100" height="10"></canvas>
-                <div id="energyMeter">
-                    <div id="energyBar"></div>
-                    <span id="energyValue">Energy: 0</span>
+        <div class="poly-panel main-panel">
+            <h1>Guitar BPM Detector</h1>
+            
+            <div class="main-controls poly-panel">
+                <div class="visualization-container">
+                    <div class="canvas-wrapper">
+                        <canvas id="audioVisualizerWave" width="100" height="15"></canvas>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="audioVisualizerEnergy" width="100" height="10"></canvas>
+                    </div>
+                    <div id="energyMeter" class="energy-meter">
+                        <div id="energyBar"></div>
+                        <span id="energyValue">Energy: 0</span>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <button id="startListening" class="btn poly-btn">Start Listening</button>
+                    <div id="bpmDisplay" class="bpm-display">Detected BPM: 90</div>
+                    <button id="fixBpm" class="btn poly-btn" disabled>Fix BPM</button>
+                </div>
+
+                <div class="bpm-controls">
+                    <input type="number" id="manualBpm" min="30" max="300" value="90" class="bpm-input poly-input">
+                    <button id="tapBpm" class="btn poly-btn">Tap BPM</button>
                 </div>
             </div>
-            <button id="startListening" class="btn">Start Listening</button>
-            <div id="bpmDisplay">Detected BPM: 90</div>
-            <button id="fixBpm" class="btn" disabled>Fix BPM</button>
-            <div class="bpm-controls">
-                <input type="number" id="manualBpm" min="30" max="300" value="90" class="bpm-input">
-                <button id="tapBpm" class="btn">Tap BPM</button>
-            </div>
-            <div class="bpm-container">
-                <div class="bpm-display">
-                    <span class="bpm-label">BPM:</span>
-                    <span id="bpmValue" class="no-bpm">--</span>
-                    <button id="setBpmButton" class="set-bpm-btn" disabled>Set BPM</button>
-                </div>
-            </div>
-        </div>
 
         <div class="rhythm-controls">
             <button id="playRhythm" class="btn">Play Rhythm</button>
