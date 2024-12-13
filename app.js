@@ -124,32 +124,42 @@ class BPMDetector {
             this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const source = this.audioContext.createMediaStreamSource(this.stream);
             
-            // Create analyzer node with better settings for rhythm detection
+            // Create analyzer node with better settings for visualization
             const analyser = this.audioContext.createAnalyser();
-            analyser.fftSize = 2048;
-            analyser.smoothingTimeConstant = 0.4;
+            analyser.fftSize = 2048; // Better resolution for visualization
+            analyser.smoothingTimeConstant = 0.8; // Smoother visualization
+            
+            // Connect source directly to analyser for visualization
             source.connect(analyser);
-
-            // Создаем фильтр для выделения низких частот
+            
+            // Create bandpass filter for beat detection
             const filter = this.audioContext.createBiquadFilter();
             filter.type = 'bandpass';
             filter.frequency.value = 100;
             filter.Q.value = 1.0;
             
+            // Create second analyzer for beat detection
+            const beatAnalyser = this.audioContext.createAnalyser();
+            beatAnalyser.fftSize = 2048;
+            beatAnalyser.smoothingTimeConstant = 0.4;
+            
+            // Connect source to filter then to beat analyzer
             source.connect(filter);
-            filter.connect(analyser);
-
-            // Process audio
-            this.processAudio(analyser);
+            filter.connect(beatAnalyser);
+            
+            // Process audio for visualization and beat detection
+            this.processAudio(analyser, beatAnalyser);
         } catch (error) {
             console.error('Error accessing microphone:', error);
             alert('Error accessing microphone. Please ensure microphone permissions are granted.');
         }
     }
 
-    processAudio(analyser) {
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
+    processAudio(visualAnalyser, beatAnalyser) {
+        const visualBufferLength = visualAnalyser.frequencyBinCount;
+        const beatBufferLength = beatAnalyser.frequencyBinCount;
+        const visualDataArray = new Uint8Array(visualBufferLength);
+        const beatDataArray = new Uint8Array(beatBufferLength);
         const energyThreshold = 1.5;
         let lastEnergy = 0;
         let energyHistory = [];
@@ -158,15 +168,19 @@ class BPMDetector {
         const analyze = () => {
             if (!this.isListening) return;
 
-            analyser.getByteTimeDomainData(dataArray);
+            // Get data for visualization
+            visualAnalyser.getByteTimeDomainData(visualDataArray);
             
-            // Calculate RMS energy
+            // Get data for beat detection
+            beatAnalyser.getByteTimeDomainData(beatDataArray);
+            
+            // Calculate RMS energy from beat analyzer
             let energy = 0;
-            for (let i = 0; i < bufferLength; i++) {
-                const amplitude = (dataArray[i] - 128) / 128;
+            for (let i = 0; i < beatBufferLength; i++) {
+                const amplitude = (beatDataArray[i] - 128) / 128;
                 energy += amplitude * amplitude;
             }
-            energy = Math.sqrt(energy / bufferLength);
+            energy = Math.sqrt(energy / beatBufferLength);
 
             // Update energy history
             energyHistory.push(energy);
@@ -188,8 +202,8 @@ class BPMDetector {
 
             lastEnergy = energy;
 
-            // Update visualizations if elements exist
-            if (this.waveCtx) this.drawWaveform(dataArray);
+            // Update visualizations
+            if (this.waveCtx) this.drawWaveform(visualDataArray);
             if (this.energyCtx) this.updateEnergyHistory(energy);
             if (this.energyBar && this.energyValue) this.updateEnergyMeter(energy);
 
@@ -204,9 +218,11 @@ class BPMDetector {
         const height = this.waveCanvas.height;
         const ctx = this.waveCtx;
 
+        // Clear previous frame
         ctx.fillStyle = 'rgb(0, 0, 0)';
         ctx.fillRect(0, 0, width, height);
 
+        // Draw new frame
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgb(0, 255, 0)';
         ctx.beginPath();
@@ -216,7 +232,7 @@ class BPMDetector {
 
         for (let i = 0; i < dataArray.length; i++) {
             const v = dataArray[i] / 128.0;
-            const y = v * height / 2;
+            const y = (v * height / 2) + height / 2; // Center the waveform
 
             if (i === 0) {
                 ctx.moveTo(x, y);
@@ -240,36 +256,83 @@ class BPMDetector {
         const height = this.energyCanvas.height;
         const ctx = this.energyCtx;
 
+        // Clear canvas
         ctx.fillStyle = 'rgb(0, 0, 0)';
         ctx.fillRect(0, 0, width, height);
+
+        // Draw energy history with gradient
+        const gradient = ctx.createLinearGradient(0, height, 0, 0);
+        gradient.addColorStop(0, '#4CAF50');   // Green
+        gradient.addColorStop(0.6, '#FFC107'); // Yellow
+        gradient.addColorStop(1, '#F44336');   // Red
 
         ctx.beginPath();
         ctx.moveTo(0, height);
 
-        // Draw energy history
+        // Draw smooth energy curve
         for (let i = 0; i < this.energyHistory.length; i++) {
-            const x = i * (width / this.energyHistory.length);
-            const y = height - (this.energyHistory[i] * height * 3);
-            ctx.lineTo(x, y);
+            const x = (i / (this.energyHistory.length - 1)) * width;
+            const normalizedEnergy = Math.min(this.energyHistory[i] * 3, 1);
+            const y = height - (normalizedEnergy * height);
+            
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                // Use quadratic curves for smoother visualization
+                const prevX = ((i - 1) / (this.energyHistory.length - 1)) * width;
+                const prevY = height - (Math.min(this.energyHistory[i - 1] * 3, 1) * height);
+                const cpX = (x + prevX) / 2;
+                ctx.quadraticCurveTo(cpX, prevY, x, y);
+            }
         }
 
         ctx.lineTo(width, height);
         ctx.closePath();
 
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, 'rgba(255, 0, 0, 0.8)');
-        gradient.addColorStop(0.6, 'rgba(255, 255, 0, 0.8)');
-        gradient.addColorStop(1, 'rgba(0, 255, 0, 0.8)');
-
         ctx.fillStyle = gradient;
         ctx.fill();
+
+        // Add grid lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        
+        // Horizontal grid lines
+        for (let i = 0; i <= 4; i++) {
+            const y = (height * i) / 4;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+        
+        // Vertical grid lines
+        for (let i = 0; i <= 8; i++) {
+            const x = (width * i) / 8;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+        }
     }
 
     updateEnergyMeter(energy) {
-        // Update energy bar
+        // Update energy bar with smoother animation
         const percentage = Math.min(energy * 300, 100);
+        this.energyBar.style.transition = 'width 100ms ease-out';
         this.energyBar.style.width = `${percentage}%`;
-        this.energyValue.textContent = `Energy: ${energy.toFixed(3)}`;
+        
+        // Update text with formatted value
+        const formattedEnergy = (energy * 100).toFixed(1);
+        this.energyValue.textContent = `Energy: ${formattedEnergy}%`;
+        
+        // Update color based on energy level
+        if (percentage > 80) {
+            this.energyBar.style.backgroundColor = '#F44336'; // Red
+        } else if (percentage > 50) {
+            this.energyBar.style.backgroundColor = '#FFC107'; // Yellow
+        } else {
+            this.energyBar.style.backgroundColor = '#4CAF50'; // Green
+        }
     }
 
     beatDetected() {
