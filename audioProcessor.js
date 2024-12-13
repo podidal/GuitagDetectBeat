@@ -3,14 +3,20 @@ class AudioProcessor {
         this.audioContext = null;
         this.stream = null;
         this.isListening = false;
-        this.beatCallback = null;
         this.visualizationCallback = null;
         this.energyCallback = null;
-        this.lastBeatTime = 0;
+        
+        // Advanced audio analysis properties
+        this.audioBuffer = [];
+        this.bufferSize = 100; // Store last 100 samples
+        this.silenceThreshold = 0.05; // Amplitude threshold to ignore noise
+        this.bpmHistory = [];
+        this.bpmHistorySize = 16; // Rolling average for BPM
+        this.consistencyWindow = 4; // 4 bars consistency check
+        this.bpmTolerance = 10; // ±10 BPM tolerance
     }
 
-    setCallbacks(beatCallback, visualizationCallback, energyCallback) {
-        this.beatCallback = beatCallback;
+    setCallbacks(visualizationCallback, energyCallback) {
         this.visualizationCallback = visualizationCallback;
         this.energyCallback = energyCallback;
     }
@@ -27,21 +33,8 @@ class AudioProcessor {
             visualAnalyser.smoothingTimeConstant = 0.8;
             source.connect(visualAnalyser);
             
-            // Create chain for beat detection
-            const filter = this.audioContext.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.value = 100;
-            filter.Q.value = 1.0;
-            
-            const beatAnalyser = this.audioContext.createAnalyser();
-            beatAnalyser.fftSize = 2048;
-            beatAnalyser.smoothingTimeConstant = 0.4;
-            
-            source.connect(filter);
-            filter.connect(beatAnalyser);
-            
             this.isListening = true;
-            this.processAudio(visualAnalyser, beatAnalyser);
+            this.processAudio(visualAnalyser);
             
             return true;
         } catch (error) {
@@ -61,17 +54,33 @@ class AudioProcessor {
         }
     }
 
-    processAudio(visualAnalyser, beatAnalyser) {
-        const visualBufferLength = visualAnalyser.frequencyBinCount;
-        const beatBufferLength = beatAnalyser.frequencyBinCount;
-        const visualDataArray = new Uint8Array(visualBufferLength);
-        const beatDataArray = new Uint8Array(beatBufferLength);
-        
-        const energyThreshold = 1.5;
-        let lastEnergy = 0;
-        let energyHistory = [];
-        const historyLength = 10;
+    calculateBPM() {
+        if (this.bpmHistory.length < 4) return null;
 
+        // Calculate rolling average BPM
+        const sortedBPMs = [...this.bpmHistory].sort((a, b) => a - b);
+        const middleBPMs = sortedBPMs.slice(
+            Math.floor(sortedBPMs.length * 0.2), 
+            Math.floor(sortedBPMs.length * 0.8)
+        );
+
+        const avgBPM = middleBPMs.reduce((a, b) => a + b, 0) / middleBPMs.length;
+        return Math.round(avgBPM);
+    }
+
+    isConsistentBPM(fixedBPM) {
+        if (this.bpmHistory.length < this.consistencyWindow) return false;
+
+        // Check if recent BPMs are within tolerance
+        return this.bpmHistory.every(bpm => 
+            Math.abs(bpm - fixedBPM) <= this.bpmTolerance
+        );
+    }
+
+    processAudio(visualAnalyser) {
+        const visualBufferLength = visualAnalyser.frequencyBinCount;
+        const visualDataArray = new Uint8Array(visualBufferLength);
+        
         const analyze = () => {
             if (!this.isListening) return;
 
@@ -80,47 +89,58 @@ class AudioProcessor {
             if (this.visualizationCallback) {
                 this.visualizationCallback(visualDataArray);
             }
-            
-            // Get beat detection data
-            beatAnalyser.getByteTimeDomainData(beatDataArray);
-            
+
             // Calculate RMS energy
             let energy = 0;
-            for (let i = 0; i < beatBufferLength; i++) {
-                const amplitude = (beatDataArray[i] - 128) / 128;
+            for (let i = 0; i < visualBufferLength; i++) {
+                const amplitude = (visualDataArray[i] - 128) / 128;
                 energy += amplitude * amplitude;
             }
-            energy = Math.sqrt(energy / beatBufferLength);
+            energy = Math.sqrt(energy / visualBufferLength);
 
-            // Update energy history
-            energyHistory.push(energy);
-            if (energyHistory.length > historyLength) {
-                energyHistory.shift();
+            // Ignore low-energy signals (noise/silence)
+            if (energy > this.silenceThreshold) {
+                // Estimate BPM (simplified method)
+                const estimatedBPM = this.estimateBPMFromBuffer(visualDataArray);
+                
+                if (estimatedBPM) {
+                    // Update BPM history
+                    this.bpmHistory.push(estimatedBPM);
+                    if (this.bpmHistory.length > this.bpmHistorySize) {
+                        this.bpmHistory.shift();
+                    }
+                }
             }
 
-            // Calculate average energy
-            const averageEnergy = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
-
-            // Send energy data to callback
+            // Energy callback
             if (this.energyCallback) {
                 this.energyCallback(energy);
             }
 
-            // Detect beat
-            if (energy > averageEnergy * energyThreshold && 
-                energy > lastEnergy && 
-                Date.now() - this.lastBeatTime > 200) {
-                
-                if (this.beatCallback) {
-                    this.beatCallback();
-                }
-                this.lastBeatTime = Date.now();
-            }
-
-            lastEnergy = energy;
+            // Schedule next analysis frame
             requestAnimationFrame(analyze);
         };
 
+        // Start analysis
         analyze();
+    }
+
+    estimateBPMFromBuffer(dataArray) {
+        // Simplified BPM estimation based on zero-crossings
+        let zeroCrossings = 0;
+        for (let i = 1; i < dataArray.length; i++) {
+            if ((dataArray[i-1] < 128 && dataArray[i] >= 128) || 
+                (dataArray[i-1] > 128 && dataArray[i] <= 128)) {
+                zeroCrossings++;
+            }
+        }
+
+        // Convert zero-crossings to rough BPM estimate
+        const sampleRate = 44100; // Typical sample rate
+        const secondsPerMinute = 60;
+        const bpm = (zeroCrossings * sampleRate * secondsPerMinute) / (dataArray.length * 2);
+
+        // Validate BPM range
+        return (bpm >= 40 && bpm <= 240) ? Math.round(bpm) : null;
     }
 }

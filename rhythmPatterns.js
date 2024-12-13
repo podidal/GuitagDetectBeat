@@ -52,6 +52,13 @@ class RhythmPatterns {
                 hihat: new Array(16).fill(false)
             }
         };
+
+        this.audioContext = null;
+        this.rhythmSources = [];
+        this.bpm = 120;
+        this.isPlaying = false;
+        this.fadeStartTime = 0;
+        this.fadeDuration = 2000; // 2 seconds fade-in
     }
 
     getPattern(name) {
@@ -104,6 +111,94 @@ class RhythmPatterns {
             name: pattern.name,
             description: pattern.description
         }));
+    }
+
+    setBPM(newBPM) {
+        this.bpm = Math.max(40, Math.min(240, newBPM));
+    }
+
+    startRhythm(pattern, autoStart = false) {
+        // Stop any existing rhythm
+        this.stopRhythm();
+
+        // Initialize audio context
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        this.currentPattern = pattern;
+        this.isPlaying = true;
+        this.fadeStartTime = this.audioContext.currentTime;
+
+        const secondsPerBeat = 60.0 / this.bpm;
+        const secondsPerStep = secondsPerBeat / 4; // 16th notes
+
+        // Create master gain node for fade control
+        const masterGain = this.audioContext.createGain();
+        masterGain.connect(this.audioContext.destination);
+        masterGain.gain.setValueAtTime(0, this.audioContext.currentTime);
+
+        // Fade-in curve
+        masterGain.gain.linearRampToValueAtTime(1, 
+            this.audioContext.currentTime + this.fadeDuration / 1000
+        );
+
+        // Play each sound type in the pattern
+        ['kick', 'snare', 'hihat'].forEach(soundType => {
+            pattern[soundType].forEach((isActive, index) => {
+                if (isActive) {
+                    const time = index * secondsPerStep;
+                    this.playSound(soundType, time, masterGain);
+                }
+            });
+        });
+
+        // Schedule repeating pattern
+        this.rhythmInterval = setInterval(() => {
+            const now = this.audioContext.currentTime;
+            ['kick', 'snare', 'hihat'].forEach(soundType => {
+                pattern[soundType].forEach((isActive, index) => {
+                    if (isActive) {
+                        const time = now + index * secondsPerStep;
+                        this.playSound(soundType, time, masterGain);
+                    }
+                });
+            });
+        }, secondsPerBeat * 1000);
+    }
+
+    playSound(soundType, time, masterGain) {
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        // Different frequencies for each sound type
+        const frequencies = {
+            kick: 80,    // Low frequency for kick
+            snare: 200,  // Mid frequency for snare
+            hihat: 6000  // High frequency for hi-hat
+        };
+
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(frequencies[soundType], time);
+
+        // Envelope
+        gainNode.gain.setValueAtTime(0, time);
+        gainNode.gain.linearRampToValueAtTime(0.7, time + 0.01);
+        gainNode.gain.linearRampToValueAtTime(0, time + 0.1);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(masterGain);
+
+        oscillator.start(time);
+        oscillator.stop(time + 0.1);
+    }
+
+    stopRhythm() {
+        if (this.rhythmInterval) {
+            clearInterval(this.rhythmInterval);
+            this.rhythmInterval = null;
+        }
+        this.isPlaying = false;
     }
 }
 
