@@ -663,7 +663,7 @@ class BeatDetector {
         // BPM tracking
         this.beatTimes = [];
         this.bpmHistory = [];
-        this.maxBeatHistory = 8;  // Store last 8 beat times
+        this.maxBeatHistory = 16;  // Increased to capture more beat history
         this.delayThreshold = 50;  // ms delay threshold
         this.lastValidBeatTime = 0;
         
@@ -671,8 +671,12 @@ class BeatDetector {
         this.stableRhythmCounter = 0;
         this.initialBPM = 90;  // Starting assumption of 90 BPM
         this.lastStableBPM = this.initialBPM;
-        this.stabilityThreshold = 0.1;  // ±10% variation allowed
-        this.stableRhythmThreshold = 8;  // 8 measures of stability
+        this.stabilityThreshold = 0.2;  // ±20% variation allowed (more lenient)
+        this.stableRhythmThreshold = 4;  // Reduced to 4 measures for quicker detection
+        
+        // Interval tracking
+        this.beatIntervals = [];
+        this.maxIntervalHistory = 8;
     }
 
     detectBPM(currentTime) {
@@ -684,27 +688,32 @@ class BeatDetector {
         // Add current beat time
         this.beatTimes.push(currentTime);
 
+        // Calculate interval since last beat
+        if (this.beatTimes.length > 1) {
+            const lastInterval = currentTime - this.beatTimes[this.beatTimes.length - 2];
+            this.beatIntervals.push(lastInterval);
+            
+            // Keep only recent intervals
+            if (this.beatIntervals.length > this.maxIntervalHistory) {
+                this.beatIntervals.shift();
+            }
+        }
+
         // Trim beat times to keep only recent beats
         if (this.beatTimes.length > this.maxBeatHistory) {
             this.beatTimes.shift();
         }
 
         // Calculate BPM if we have at least 2 beats
-        if (this.beatTimes.length >= 2) {
-            const bpms = [];
+        if (this.beatIntervals.length >= 2) {
+            // Calculate average interval
+            const avgInterval = this.beatIntervals.reduce((a, b) => a + b, 0) / this.beatIntervals.length;
             
-            // Calculate BPM between consecutive beats
-            for (let i = 1; i < this.beatTimes.length; i++) {
-                const timeDiff = this.beatTimes[i] - this.beatTimes[i-1];
-                const beatsPerMinute = 60000 / timeDiff;
-                bpms.push(beatsPerMinute);
-            }
-
-            // Calculate average of last 2 measures (4 beats)
-            const averageBPM = bpms.slice(-2).reduce((a, b) => a + b, 0) / 2;
-
-            // Store in history
-            this.bpmHistory.push(averageBPM);
+            // Convert interval to BPM
+            const beatsPerMinute = Math.round(60000 / avgInterval);
+            
+            // Store in BPM history
+            this.bpmHistory.push(beatsPerMinute);
             if (this.bpmHistory.length > 4) {
                 this.bpmHistory.shift();
             }
@@ -712,7 +721,7 @@ class BeatDetector {
             // Update last valid beat time
             this.lastValidBeatTime = currentTime;
 
-            return Math.round(averageBPM);
+            return beatsPerMinute;
         }
 
         return null;
@@ -731,14 +740,14 @@ class BeatDetector {
     isRhythmStable() {
         const currentBPM = this.getStableBPM();
         
-        // Check if current BPM is within 10% of last stable BPM
+        // Check if current BPM is within threshold of last stable BPM
         const isWithinThreshold = 
             Math.abs(currentBPM - this.lastStableBPM) / this.lastStableBPM <= this.stabilityThreshold;
         
         if (isWithinThreshold) {
             this.stableRhythmCounter++;
             
-            // If rhythm has been stable for 8 measures, update last stable BPM
+            // If rhythm has been stable for specified measures, update last stable BPM
             if (this.stableRhythmCounter >= this.stableRhythmThreshold) {
                 this.lastStableBPM = currentBPM;
                 return true;
@@ -754,6 +763,7 @@ class BeatDetector {
     reset() {
         this.beatTimes = [];
         this.bpmHistory = [];
+        this.beatIntervals = [];
         this.lastValidBeatTime = 0;
         this.stableRhythmCounter = 0;
         this.lastStableBPM = this.initialBPM;
