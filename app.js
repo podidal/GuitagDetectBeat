@@ -316,10 +316,8 @@ class BPMDetector {
         this.updateStatus('detecting');
         
         // Check if beat detection has stopped or BPM dropped significantly
-        if (!bpm || this.beatDetector.stableRhythmCounter === 0) {
-            // Stop rhythm if no beat detected or rhythm became unstable
-            this.stopRhythm();
-            this.updateStatus('stopped');
+        if (!bpm) {
+            // Only stop if no beats for extended period
             return;
         }
 
@@ -671,15 +669,30 @@ class BeatDetector {
         this.stableRhythmCounter = 0;
         this.initialBPM = 90;  // Starting assumption of 90 BPM
         this.lastStableBPM = this.initialBPM;
-        this.stabilityThreshold = 0.2;  // ±20% variation allowed (more lenient)
-        this.stableRhythmThreshold = 4;  // Reduced to 4 measures for quicker detection
+        this.stabilityThreshold = 0.3;  // ±30% variation allowed (even more lenient)
+        this.stableRhythmThreshold = 2;  // Minimum measures to consider stable
+        this.minBeatsForStability = 4;  // Minimum beats to start considering stability
         
         // Interval tracking
         this.beatIntervals = [];
         this.maxIntervalHistory = 8;
+        
+        // Timeout tracking
+        this.noBeatsTimeout = null;
+        this.NO_BEATS_TIMEOUT = 2000;  // 2 seconds without beats
     }
 
     detectBPM(currentTime) {
+        // Clear any previous no-beats timeout
+        if (this.noBeatsTimeout) {
+            clearTimeout(this.noBeatsTimeout);
+        }
+
+        // Set a timeout to track no beats
+        this.noBeatsTimeout = setTimeout(() => {
+            this.reset();
+        }, this.NO_BEATS_TIMEOUT);
+
         // Ignore beats that are too close together (potential noise)
         if (currentTime - this.lastValidBeatTime < this.delayThreshold) {
             return null;
@@ -704,7 +717,7 @@ class BeatDetector {
             this.beatTimes.shift();
         }
 
-        // Calculate BPM if we have at least 2 beats
+        // Calculate BPM if we have enough beats
         if (this.beatIntervals.length >= 2) {
             // Calculate average interval
             const avgInterval = this.beatIntervals.reduce((a, b) => a + b, 0) / this.beatIntervals.length;
@@ -738,6 +751,11 @@ class BeatDetector {
 
     // Check if rhythm is stable
     isRhythmStable() {
+        // Ensure we have enough beats to consider stability
+        if (this.beatIntervals.length < this.minBeatsForStability) {
+            return false;
+        }
+
         const currentBPM = this.getStableBPM();
         
         // Check if current BPM is within threshold of last stable BPM
@@ -761,6 +779,11 @@ class BeatDetector {
     }
 
     reset() {
+        // Clear any existing timeout
+        if (this.noBeatsTimeout) {
+            clearTimeout(this.noBeatsTimeout);
+        }
+
         this.beatTimes = [];
         this.bpmHistory = [];
         this.beatIntervals = [];
