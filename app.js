@@ -37,6 +37,8 @@ class BPMDetector {
         this.versionDisplay = document.getElementById('version');
         this.tapBpmButton = document.getElementById('tapBpm');
         this.manualBpmInput = document.getElementById('manualBpm');
+
+        // BPM Adjustment Buttons
         this.bpmDecreaseButton = document.getElementById('bpmDecrease');
         this.bpmIncreaseButton = document.getElementById('bpmIncrease');
 
@@ -295,22 +297,23 @@ class BPMDetector {
     beatDetected() {
         const now = Date.now();
         const bpm = this.beatDetector.detectBPM(now);
-        if (bpm) {
-            const stableBPM = this.beatDetector.getStableBPM();
-            if (stableBPM) {
-                this.bpmDisplay.textContent = `Detected BPM: ${stableBPM}`;
-                this.fixedBPM = stableBPM;
-                this.fixBpmButton.disabled = false;
-                
-                // Auto-play rhythm if it's stable
-                if (this.beatDetector.isRhythmStable() && !this.isPlayingRhythm) {
-                    this.playRhythm();
-                }
-            }
-        } else {
-            // If no beat detected for a while, stop the rhythm
-            if (this.isPlayingRhythm) {
-                this.stopRhythm();
+        
+        // Check if beat detection has stopped or BPM dropped significantly
+        if (!bpm || this.beatDetector.stableRhythmCounter === 0) {
+            // Stop rhythm if no beat detected or rhythm became unstable
+            this.stopRhythm();
+            return;
+        }
+
+        const stableBPM = this.beatDetector.getStableBPM();
+        if (stableBPM) {
+            this.bpmDisplay.textContent = `Detected BPM: ${stableBPM}`;
+            this.fixedBPM = stableBPM;
+            this.fixBpmButton.disabled = false;
+            
+            // Auto-play rock beat if rhythm is stable
+            if (this.beatDetector.isRhythmStable()) {
+                this.playRhythm('basic');  // Specifically play basic rock rhythm
             }
         }
     }
@@ -605,17 +608,21 @@ class BPMDetector {
 
     adjustBPM(adjustment) {
         // Adjust the current BPM
-        if (this.fixedBPM !== null) {
-            this.fixedBPM = Math.max(40, Math.min(220, this.fixedBPM + adjustment));
-            
-            // Update BPM display
-            this.bpmDisplay.textContent = `Detected BPM: ${this.fixedBPM}`;
-            
-            // If rhythm is currently playing, restart with new BPM
-            if (this.isPlayingRhythm) {
-                this.stopRhythm();
-                this.playRhythm();
-            }
+        const currentBPM = this.beatDetector.getStableBPM();
+        const newBPM = Math.max(40, Math.min(220, currentBPM + adjustment));
+        
+        // Update beat detector's last stable BPM
+        this.beatDetector.lastStableBPM = newBPM;
+        this.beatDetector.initialBPM = newBPM;
+        
+        // Update display and fixed BPM
+        this.bpmDisplay.textContent = `Detected BPM: ${newBPM}`;
+        this.fixedBPM = newBPM;
+
+        // If currently playing a rhythm, restart with new BPM
+        if (this.isPlayingRhythm) {
+            this.stopRhythm();
+            this.playRhythm(this.currentPattern);
         }
     }
 }
@@ -628,14 +635,13 @@ class BeatDetector {
         this.maxBeatHistory = 8;  // Store last 8 beat times
         this.delayThreshold = 50;  // ms delay threshold
         this.lastValidBeatTime = 0;
-
+        
         // Stable rhythm detection
-        this.stableRhythmMeasures = 0;
-        this.maxStableMeasures = 8;  // 8 measures to consider rhythm stable
-        this.bpmStabilityThreshold = 0.1;  // ±10% variation allowed
-        this.lastStableBPM = null;
-        this.rhythmStabilityTimer = null;
-        this.rhythmStabilityTimeout = 2000;  // 2 seconds of inactivity to stop
+        this.stableRhythmCounter = 0;
+        this.initialBPM = 90;  // Starting assumption of 90 BPM
+        this.lastStableBPM = this.initialBPM;
+        this.stabilityThreshold = 0.1;  // ±10% variation allowed
+        this.stableRhythmThreshold = 8;  // 8 measures of stability
     }
 
     detectBPM(currentTime) {
@@ -672,9 +678,6 @@ class BeatDetector {
                 this.bpmHistory.shift();
             }
 
-            // Check rhythm stability
-            this.checkRhythmStability(averageBPM);
-
             // Update last valid beat time
             this.lastValidBeatTime = currentTime;
 
@@ -684,67 +687,45 @@ class BeatDetector {
         return null;
     }
 
-    checkRhythmStability(currentBPM) {
-        // Clear any existing stability timer
-        if (this.rhythmStabilityTimer) {
-            clearTimeout(this.rhythmStabilityTimer);
-        }
-
-        // Set a timeout to check for rhythm interruption
-        this.rhythmStabilityTimer = setTimeout(() => {
-            // Reset stability if no beat detected
-            this.stableRhythmMeasures = 0;
-            this.lastStableBPM = null;
-        }, this.rhythmStabilityTimeout);
-
-        // If this is the first stable BPM, set it
-        if (this.lastStableBPM === null) {
-            this.lastStableBPM = currentBPM;
-            this.stableRhythmMeasures = 1;
-            return false;
-        }
-
-        // Check if current BPM is within threshold of last stable BPM
-        const isStable = Math.abs(currentBPM - this.lastStableBPM) / this.lastStableBPM <= this.bpmStabilityThreshold;
-
-        if (isStable) {
-            this.stableRhythmMeasures++;
-
-            // Update last stable BPM
-            this.lastStableBPM = (this.lastStableBPM + currentBPM) / 2;
-        } else {
-            // Reset stability if BPM varies too much
-            this.stableRhythmMeasures = 0;
-            this.lastStableBPM = currentBPM;
-        }
-
-        return this.stableRhythmMeasures >= this.maxStableMeasures;
-    }
-
-    isRhythmStable() {
-        return this.stableRhythmMeasures >= this.maxStableMeasures;
-    }
-
+    // Get the most recent stable BPM
     getStableBPM() {
-        if (this.bpmHistory.length === 0) return null;
+        if (this.bpmHistory.length === 0) return this.initialBPM;
 
         // Calculate average of recent BPM measurements
         const averageBPM = this.bpmHistory.reduce((a, b) => a + b, 0) / this.bpmHistory.length;
         return Math.round(averageBPM);
     }
 
+    // Check if rhythm is stable
+    isRhythmStable() {
+        const currentBPM = this.getStableBPM();
+        
+        // Check if current BPM is within 10% of last stable BPM
+        const isWithinThreshold = 
+            Math.abs(currentBPM - this.lastStableBPM) / this.lastStableBPM <= this.stabilityThreshold;
+        
+        if (isWithinThreshold) {
+            this.stableRhythmCounter++;
+            
+            // If rhythm has been stable for 8 measures, update last stable BPM
+            if (this.stableRhythmCounter >= this.stableRhythmThreshold) {
+                this.lastStableBPM = currentBPM;
+                return true;
+            }
+        } else {
+            // Reset counter if BPM varies too much
+            this.stableRhythmCounter = 0;
+        }
+        
+        return false;
+    }
+
     reset() {
         this.beatTimes = [];
         this.bpmHistory = [];
         this.lastValidBeatTime = 0;
-        this.stableRhythmMeasures = 0;
-        this.lastStableBPM = null;
-        
-        // Clear any existing stability timer
-        if (this.rhythmStabilityTimer) {
-            clearTimeout(this.rhythmStabilityTimer);
-            this.rhythmStabilityTimer = null;
-        }
+        this.stableRhythmCounter = 0;
+        this.lastStableBPM = this.initialBPM;
     }
 }
 
