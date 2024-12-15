@@ -53,6 +53,16 @@ class BPMDetector {
             'custom': document.getElementById('pattern-custom')
         };
 
+        // Status tracking
+        this.statusMessages = {
+            waiting: 'Ожидание...',
+            listening: 'Прослушивание...',
+            detecting: 'Определение ритма...',
+            rhythmStable: 'Ритм стабилизирован',
+            playingRhythm: 'Воспроизведение ритма',
+            stopped: 'Остановлено'
+        };
+
         // Initialize pattern grid
         this.initializePatternGrid();
         
@@ -246,6 +256,7 @@ class BPMDetector {
             
             this.isPlayingRhythm = true;
             this.playRhythmButton.textContent = 'Stop';
+            this.updateStatus('playingRhythm', `${this.fixedBPM} BPM`);
         } else {
             this.stopRhythm();
         }
@@ -260,6 +271,7 @@ class BPMDetector {
         this.playRhythmButton.textContent = 'Play Rhythm';
         // Clear current step indicator
         this.updateCurrentStepDisplay(-1);
+        this.updateStatus('stopped');
     }
 
     updateCurrentStepDisplay(currentStep) {
@@ -285,12 +297,14 @@ class BPMDetector {
                 this.startButton.classList.add('listening');
                 this.fixedBPM = null;
                 this.beatDetector.reset();
+                this.updateStatus('listening');
             }
         } else {
             this.audioProcessor.stopListening();
             this.isListening = false;
             this.startButton.textContent = 'Start Listening';
             this.startButton.classList.remove('listening');
+            this.updateStatus('stopped');
         }
     }
 
@@ -298,22 +312,28 @@ class BPMDetector {
         const now = Date.now();
         const bpm = this.beatDetector.detectBPM(now);
         
+        // Update status to detecting
+        this.updateStatus('detecting');
+        
         // Check if beat detection has stopped or BPM dropped significantly
         if (!bpm || this.beatDetector.stableRhythmCounter === 0) {
             // Stop rhythm if no beat detected or rhythm became unstable
             this.stopRhythm();
+            this.updateStatus('stopped');
             return;
         }
 
         const stableBPM = this.beatDetector.getStableBPM();
         if (stableBPM) {
-            this.bpmDisplay.textContent = `Detected BPM: ${stableBPM}`;
+            // Update status with current BPM
+            this.updateStatus('detecting', `${stableBPM} BPM`);
             this.fixedBPM = stableBPM;
             this.fixBpmButton.disabled = false;
             
             // Auto-play rock beat if rhythm is stable
             if (this.beatDetector.isRhythmStable()) {
                 this.playRhythm('basic');  // Specifically play basic rock rhythm
+                this.updateStatus('rhythmStable', `${stableBPM} BPM`);
             }
         }
     }
@@ -446,6 +466,7 @@ class BPMDetector {
         this.startButton.textContent = 'Start Listening';
         this.startButton.classList.remove('listening');
         this.playRhythmButton.disabled = false;
+        this.updateStatus('stopped');
     }
 
     createKick(time, velocity = 1) {
@@ -571,6 +592,7 @@ class BPMDetector {
             if (newBpm >= 30 && newBpm <= 300) {
                 this.fixedBPM = newBpm;
                 this.bpmDisplay.textContent = `BPM: ${this.fixedBPM}`;
+                this.updateStatus('detecting', `${newBpm} BPM`);
             }
         });
     }
@@ -602,6 +624,7 @@ class BPMDetector {
                 this.fixedBPM = bpm;
                 this.bpmDisplay.textContent = `BPM: ${this.fixedBPM}`;
                 this.manualBpmInput.value = this.fixedBPM;
+                this.updateStatus('detecting', `${bpm} BPM`);
             }
         }
     }
@@ -615,15 +638,23 @@ class BPMDetector {
         this.beatDetector.lastStableBPM = newBPM;
         this.beatDetector.initialBPM = newBPM;
         
-        // Update display and fixed BPM
-        this.bpmDisplay.textContent = `Detected BPM: ${newBPM}`;
+        // Update status with new BPM
+        this.updateStatus('detecting', `${newBPM} BPM`);
         this.fixedBPM = newBPM;
 
         // If currently playing a rhythm, restart with new BPM
         if (this.isPlayingRhythm) {
             this.stopRhythm();
             this.playRhythm(this.currentPattern);
+            this.updateStatus('playingRhythm', `${newBPM} BPM`);
         }
+    }
+
+    updateStatus(status, additionalInfo = '') {
+        const message = this.statusMessages[status] || status;
+        this.bpmDisplay.textContent = additionalInfo 
+            ? `${message}: ${additionalInfo}` 
+            : message;
     }
 }
 
