@@ -27,7 +27,11 @@
                 
                 <div class="control-group">
                     <button id="startListening" class="btn poly-btn">Start Listening</button>
-                    <div id="bpmDisplay" class="bpm-display">Detected BPM: 90</div>
+                    <div class="bpm-controls">
+                        <button id="bpmDecrease" class="btn bpm-adjust" title="Уменьшить BPM на 10">-10 BPM</button>
+                        <span id="bpmDisplay" class="bpm-display">Detected BPM: 90</span>
+                        <button id="bpmIncrease" class="btn bpm-adjust" title="Увеличить BPM на 10">+10 BPM</button>
+                    </div>
                     <button id="fixBpm" class="btn poly-btn" disabled>Fix BPM</button>
                 </div>
 
@@ -40,11 +44,11 @@
         <div class="rhythm-controls">
             <button id="playRhythm" class="btn">Play Rhythm</button>
             <div class="pattern-buttons">
-                <button id="pattern-basic" class="btn pattern-btn" title="Базовый ритм 4/4">Простой ритм</button>
-                <button id="pattern-march" class="btn pattern-btn" title="Простой маршевый ритм">Марш</button>
-                <button id="pattern-pop" class="btn pattern-btn" title="Простой поп-ритм">Поп-ритм</button>
-                <button id="pattern-rock" class="btn pattern-btn" title="Базовый рок-ритм">Рок-ритм</button>
-                <button id="pattern-dance" class="btn pattern-btn" title="Простой танцевальный ритм">Танцевальный</button>
+                <button id="pattern-basic" class="btn pattern-btn" title="Классический рок-ритм">Базовый рок</button>
+                <button id="pattern-march" class="btn pattern-btn" title="Строгий маршевый ритм">Военный марш</button>
+                <button id="pattern-electronic" class="btn pattern-btn" title="Современный электронный бит">Электронный</button>
+                <button id="pattern-reggae" class="btn pattern-btn" title="Расслабленный регги-ритм">Регги</button>
+                <button id="pattern-funk" class="btn pattern-btn" title="Синкопированный фанк-ритм">Фанк</button>
                 <button id="pattern-random" class="btn pattern-btn" title="Сгенерировать случайный ритм">Случайный ритм</button>
                 <button id="pattern-custom" class="btn pattern-btn active">Свой ритм</button>
             </div>
