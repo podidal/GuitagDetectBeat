@@ -59,6 +59,21 @@
                 <div class="rhythm-grid" id="hihatGrid"></div>
             </div>
         </div>
+
+        <div class="visualizations">
+            <div class="waveform-container">
+                <h3>Audio Waveform</h3>
+                <canvas id="audioVisualizerWave" width="300" height="100"></canvas>
+            </div>
+            <div class="energy-container">
+                <h3>Energy Level</h3>
+                <div class="energy-meter-wrapper">
+                    <div id="energyBar" class="energy-bar"></div>
+                    <span id="energyValue" class="energy-value">0%</span>
+                </div>
+                <canvas id="audioVisualizerEnergy" width="300" height="100"></canvas>
+            </div>
+        </div>
     </div>
 
     <script src="rhythmPatterns.js"></script>

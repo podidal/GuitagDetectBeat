@@ -67,10 +67,19 @@ class AudioProcessor {
         const visualDataArray = new Uint8Array(visualBufferLength);
         const beatDataArray = new Uint8Array(beatBufferLength);
         
-        const energyThreshold = 1.5;
+        const energyThreshold = 2.0; // Increased sensitivity
+        const minTimeBetweenBeats = 300; // Minimum time between beats (ms)
+        const maxTimeBetweenBeats = 2000; // Maximum time between beats (ms)
+        
         let lastEnergy = 0;
         let energyHistory = [];
-        const historyLength = 10;
+        const historyLength = 15; // Increased history length
+        
+        // Beat detection parameters
+        let beatConfidence = 0;
+        const confidenceThreshold = 3; // Require multiple signals to confirm a beat
+        let expectedBeatInterval = 0;
+        let lastBeatTimestamp = 0;
 
         const analyze = () => {
             if (!this.isListening) return;
@@ -84,11 +93,13 @@ class AudioProcessor {
             // Get beat detection data
             beatAnalyser.getByteTimeDomainData(beatDataArray);
             
-            // Calculate RMS energy
+            // Calculate RMS energy with more robust method
             let energy = 0;
+            let peakAmplitude = 0;
             for (let i = 0; i < beatBufferLength; i++) {
-                const amplitude = (beatDataArray[i] - 128) / 128;
+                const amplitude = Math.abs((beatDataArray[i] - 128) / 128);
                 energy += amplitude * amplitude;
+                peakAmplitude = Math.max(peakAmplitude, amplitude);
             }
             energy = Math.sqrt(energy / beatBufferLength);
 
@@ -98,23 +109,46 @@ class AudioProcessor {
                 energyHistory.shift();
             }
 
-            // Calculate average energy
+            // Calculate energy statistics
             const averageEnergy = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
+            const energyVariance = energyHistory.reduce((a, b) => a + Math.pow(b - averageEnergy, 2), 0) / energyHistory.length;
 
             // Send energy data to callback
             if (this.energyCallback) {
                 this.energyCallback(energy);
             }
 
-            // Detect beat
-            if (energy > averageEnergy * energyThreshold && 
-                energy > lastEnergy && 
-                Date.now() - this.lastBeatTime > 200) {
-                
+            // Advanced beat detection
+            const currentTime = Date.now();
+            const timeSinceLastBeat = currentTime - this.lastBeatTime;
+
+            // Check for potential beat conditions
+            const isEnergySignificant = energy > averageEnergy * energyThreshold;
+            const isEnergyIncreasing = energy > lastEnergy;
+            const isTimingValid = timeSinceLastBeat > minTimeBetweenBeats && 
+                                  timeSinceLastBeat < maxTimeBetweenBeats;
+
+            // Adaptive beat confidence
+            if (isEnergySignificant && isEnergyIncreasing) {
+                beatConfidence++;
+            } else {
+                beatConfidence = Math.max(0, beatConfidence - 1);
+            }
+
+            // Confirm beat with confidence and timing
+            if (beatConfidence >= confidenceThreshold && isTimingValid) {
                 if (this.beatCallback) {
                     this.beatCallback();
                 }
-                this.lastBeatTime = Date.now();
+                
+                // Update beat interval for future prediction
+                if (lastBeatTimestamp > 0) {
+                    expectedBeatInterval = currentTime - lastBeatTimestamp;
+                }
+                
+                lastBeatTimestamp = currentTime;
+                this.lastBeatTime = currentTime;
+                beatConfidence = 0; // Reset confidence
             }
 
             lastEnergy = energy;

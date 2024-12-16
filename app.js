@@ -337,125 +337,93 @@ class BPMDetector {
     }
 
     drawWaveform(dataArray) {
-        const width = this.waveCanvas.width;
-        const height = this.waveCanvas.height;
-        const ctx = this.waveCtx;
+        if (!this.waveCanvas || !this.waveCtx) return;
 
-        // Clear previous frame
-        ctx.fillStyle = 'rgb(0, 0, 0)';
-        ctx.fillRect(0, 0, width, height);
+        // Clear previous drawing
+        this.waveCtx.clearRect(0, 0, this.waveCanvas.width, this.waveCanvas.height);
 
-        // Draw new frame
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgb(0, 255, 0)';
-        ctx.beginPath();
+        // Set drawing styles
+        this.waveCtx.lineWidth = 2;
+        this.waveCtx.strokeStyle = 'rgb(0, 255, 0)';
+        this.waveCtx.beginPath();
 
-        const sliceWidth = width * 1.0 / dataArray.length;
+        // Calculate slicing for visualization
+        const sliceWidth = this.waveCanvas.width / dataArray.length;
         let x = 0;
 
         for (let i = 0; i < dataArray.length; i++) {
+            // Convert audio data to visual coordinates
             const v = dataArray[i] / 128.0;
-            const y = (v * height / 2) + height / 2; // Center the waveform
+            const y = v * this.waveCanvas.height / 2;
 
             if (i === 0) {
-                ctx.moveTo(x, y);
+                this.waveCtx.moveTo(x, y);
             } else {
-                ctx.lineTo(x, y);
+                this.waveCtx.lineTo(x, y);
             }
 
             x += sliceWidth;
         }
 
-        ctx.lineTo(width, height / 2);
-        ctx.stroke();
+        // Finish drawing waveform
+        this.waveCtx.lineTo(this.waveCanvas.width, this.waveCanvas.height / 2);
+        this.waveCtx.stroke();
     }
 
     updateEnergyHistory(energy) {
-        // Shift energy history
+        if (!this.energyCanvas) return;
+
+        // Add new energy value to history
         this.energyHistory.push(energy);
-        this.energyHistory.shift();
 
-        const width = this.energyCanvas.width;
-        const height = this.energyCanvas.height;
-        const ctx = this.energyCtx;
+        // Keep only as many values as canvas width
+        if (this.energyHistory.length > this.energyCanvas.width) {
+            this.energyHistory.shift();
+        }
 
-        // Clear canvas
-        ctx.fillStyle = 'rgb(0, 0, 0)';
-        ctx.fillRect(0, 0, width, height);
+        // Redraw energy visualization
+        this.drawEnergyVisualization();
+    }
 
-        // Draw energy history with gradient
-        const gradient = ctx.createLinearGradient(0, height, 0, 0);
-        gradient.addColorStop(0, '#4CAF50');   // Green
-        gradient.addColorStop(0.6, '#FFC107'); // Yellow
-        gradient.addColorStop(1, '#F44336');   // Red
+    drawEnergyVisualization() {
+        if (!this.energyCanvas || !this.energyCtx) return;
 
-        ctx.beginPath();
-        ctx.moveTo(0, height);
+        // Clear previous drawing
+        this.energyCtx.clearRect(0, 0, this.energyCanvas.width, this.energyCanvas.height);
 
-        // Draw smooth energy curve
-        for (let i = 0; i < this.energyHistory.length; i++) {
-            const x = (i / (this.energyHistory.length - 1)) * width;
-            const normalizedEnergy = Math.min(this.energyHistory[i] * 3, 1);
-            const y = height - (normalizedEnergy * height);
-            
-            if (i === 0) {
-                ctx.moveTo(x, y);
+        // Set drawing styles
+        this.energyCtx.lineWidth = 2;
+        this.energyCtx.strokeStyle = 'rgb(255, 0, 0)';
+        this.energyCtx.beginPath();
+
+        // Draw energy history
+        const maxHeight = this.energyCanvas.height;
+        const maxEnergy = Math.max(...this.energyHistory);
+
+        this.energyHistory.forEach((energy, index) => {
+            const normalizedHeight = (energy / (maxEnergy || 1)) * maxHeight;
+            const x = index;
+            const y = maxHeight - normalizedHeight;
+
+            if (index === 0) {
+                this.energyCtx.moveTo(x, y);
             } else {
-                // Use quadratic curves for smoother visualization
-                const prevX = ((i - 1) / (this.energyHistory.length - 1)) * width;
-                const prevY = height - (Math.min(this.energyHistory[i - 1] * 3, 1) * height);
-                const cpX = (x + prevX) / 2;
-                ctx.quadraticCurveTo(cpX, prevY, x, y);
+                this.energyCtx.lineTo(x, y);
             }
-        }
+        });
 
-        ctx.lineTo(width, height);
-        ctx.closePath();
-
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // Add grid lines
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1;
-        
-        // Horizontal grid lines
-        for (let i = 0; i <= 4; i++) {
-            const y = (height * i) / 4;
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
-            ctx.stroke();
-        }
-        
-        // Vertical grid lines
-        for (let i = 0; i <= 8; i++) {
-            const x = (width * i) / 8;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-        }
+        this.energyCtx.stroke();
     }
 
     updateEnergyMeter(energy) {
-        // Update energy bar with smoother animation
-        const percentage = Math.min(energy * 300, 100);
-        this.energyBar.style.transition = 'width 100ms ease-out';
-        this.energyBar.style.width = `${percentage}%`;
-        
-        // Update text with formatted value
-        const formattedEnergy = (energy * 100).toFixed(1);
-        this.energyValue.textContent = `Energy: ${formattedEnergy}%`;
-        
-        // Update color based on energy level
-        if (percentage > 80) {
-            this.energyBar.style.backgroundColor = '#F44336'; // Red
-        } else if (percentage > 50) {
-            this.energyBar.style.backgroundColor = '#FFC107'; // Yellow
-        } else {
-            this.energyBar.style.backgroundColor = '#4CAF50'; // Green
-        }
+        if (!this.energyBar || !this.energyValue) return;
+
+        // Update energy bar width
+        const normalizedEnergy = Math.min(energy * 100, 100);
+        this.energyBar.style.width = `${normalizedEnergy}%`;
+
+        // Update energy value text
+        this.energyValue.textContent = `${Math.round(normalizedEnergy)}%`;
     }
 
     fixBPM() {
