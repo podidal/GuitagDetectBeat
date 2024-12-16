@@ -661,21 +661,26 @@ class BeatDetector {
         // BPM tracking
         this.beatTimes = [];
         this.bpmHistory = [];
-        this.maxBeatHistory = 16;  // Increased to capture more beat history
-        this.delayThreshold = 50;  // ms delay threshold
+        this.maxBeatHistory = 16;  // Capture comprehensive beat history
+        this.delayThreshold = 50;  // ms delay threshold to filter noise
         this.lastValidBeatTime = 0;
         
         // Stable rhythm detection
         this.stableRhythmCounter = 0;
         this.initialBPM = 90;  // Starting assumption of 90 BPM
         this.lastStableBPM = this.initialBPM;
-        this.stabilityThreshold = 0.3;  // ±30% variation allowed (even more lenient)
+        this.stabilityThreshold = 0.3;  // ±30% variation allowed (as per description)
         this.stableRhythmThreshold = 2;  // Minimum measures to consider stable
         this.minBeatsForStability = 4;  // Minimum beats to start considering stability
         
         // Interval tracking
         this.beatIntervals = [];
         this.maxIntervalHistory = 8;
+        
+        // Energy tracking
+        this.energyLevels = [];
+        this.maxEnergyHistory = 10;
+        this.energyThreshold = 0.2;  // 20% variation threshold
         
         // Timeout tracking
         this.noBeatsTimeout = null;
@@ -688,7 +693,7 @@ class BeatDetector {
             clearTimeout(this.noBeatsTimeout);
         }
 
-        // Set a timeout to track no beats
+        // Set a timeout to track prolonged silence
         this.noBeatsTimeout = setTimeout(() => {
             this.reset();
         }, this.NO_BEATS_TIMEOUT);
@@ -762,7 +767,10 @@ class BeatDetector {
         const isWithinThreshold = 
             Math.abs(currentBPM - this.lastStableBPM) / this.lastStableBPM <= this.stabilityThreshold;
         
-        if (isWithinThreshold) {
+        // Check energy consistency
+        const energyConsistent = this.checkEnergyConsistency();
+        
+        if (isWithinThreshold && energyConsistent) {
             this.stableRhythmCounter++;
             
             // If rhythm has been stable for specified measures, update last stable BPM
@@ -771,11 +779,35 @@ class BeatDetector {
                 return true;
             }
         } else {
-            // Reset counter if BPM varies too much
+            // Reset counter if BPM varies too much or energy is inconsistent
             this.stableRhythmCounter = 0;
         }
         
         return false;
+    }
+
+    // Check consistency of energy levels
+    checkEnergyConsistency(energyLevel) {
+        // Add current energy level to history
+        this.energyLevels.push(energyLevel);
+        
+        // Keep only recent energy levels
+        if (this.energyLevels.length > this.maxEnergyHistory) {
+            this.energyLevels.shift();
+        }
+        
+        // If not enough energy measurements, return false
+        if (this.energyLevels.length < 4) {
+            return false;
+        }
+        
+        // Calculate energy variation
+        const minEnergy = Math.min(...this.energyLevels);
+        const maxEnergy = Math.max(...this.energyLevels);
+        const energyVariation = (maxEnergy - minEnergy) / minEnergy;
+        
+        // Consider energy consistent if variation is low
+        return energyVariation < this.energyThreshold;
     }
 
     reset() {
@@ -787,6 +819,7 @@ class BeatDetector {
         this.beatTimes = [];
         this.bpmHistory = [];
         this.beatIntervals = [];
+        this.energyLevels = [];
         this.lastValidBeatTime = 0;
         this.stableRhythmCounter = 0;
         this.lastStableBPM = this.initialBPM;

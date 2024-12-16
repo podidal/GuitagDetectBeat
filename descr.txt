@@ -1,0 +1,250 @@
+# Guitar Beat Detector - Function Descriptions
+
+## Main Classes and Their Functions
+
+### 1. BPMDetector Class
+Primary class responsible for managing beat detection, rhythm visualization, and user interactions.
+
+#### Key Methods:
+- `constructor()`: 
+  - Initializes the entire application
+  - Sets up audio processing, visualization elements, and UI components
+  - Configures event listeners for various buttons and interactions
+
+- `toggleListening()`: 
+  - Starts or stops audio listening for beat detection
+  - Toggles microphone access and beat detection process
+
+- `fixBPM()`: 
+  - Locks the current detected BPM as a fixed tempo
+  - Allows manual BPM adjustment
+
+- `playRhythm()`: 
+  - Plays the currently selected rhythm pattern
+  - Generates audio representation of the selected beat pattern
+
+- `setPattern(patternId)`: 
+  - Changes the current rhythm pattern
+  - Updates UI to reflect the selected pattern
+  - Supports predefined and custom rhythm patterns
+
+- `adjustBPM(amount)`: 
+  - Increases or decreases the current BPM
+  - Allows fine-tuning of rhythm tempo
+
+- `updateVersion()`: 
+  - Dynamically updates the application version display
+  - Generates a build number based on current timestamp
+
+### 2. AudioProcessor Class
+Handles audio input processing, beat detection, and visualization.
+
+#### Key Methods:
+- `startListening()`: 
+  - Requests microphone access
+  - Sets up audio context and analysis nodes
+  - Prepares for real-time audio processing
+
+- `stopListening()`: 
+  - Stops microphone access
+  - Closes audio context
+  - Terminates audio processing
+
+- `processAudio()`: 
+  - Performs real-time audio analysis
+  - Detects beats based on energy thresholds
+  - Provides visualization and beat detection callbacks
+
+### 3. BeatDetector Class
+Responsible for precise BPM and rhythm stability detection.
+
+#### Key Methods:
+- `detectBPM(currentTime)`: 
+  - Calculates BPM based on beat intervals
+  - Tracks beat history and rhythm stability
+
+- `getStableBPM()`: 
+  - Returns the most recently detected stable BPM
+  - Uses statistical analysis of beat intervals
+
+- `isRhythmStable()`: 
+  - Determines if the detected rhythm is consistent
+  - Applies thresholds to validate rhythm stability
+
+### 4. RhythmPatterns Class
+Manages predefined and custom rhythm patterns.
+
+#### Key Methods:
+- `getPattern(name)`: 
+  - Retrieves a specific rhythm pattern
+  - Supports predefined patterns like rock, march, electronic, etc.
+
+- `setCustomPattern()`: 
+  - Allows users to create and modify custom rhythm patterns
+  - Supports individual beat modifications for kick, snare, and hi-hat
+
+- `generateRandomPattern()`: 
+  - Creates a randomly generated rhythm pattern
+  - Maintains musical coherence with weighted beat generation
+
+## Rhythm Pattern Types
+1. Basic Rock
+2. Military March
+3. Electronic
+4. Reggae
+5. Funk
+6. Random
+7. Custom
+
+## Application Flow: Detailed User Journey
+
+### 1. Application Initialization
+- Web page loads
+- UI elements and event listeners are set up
+- Default BPM set to 90
+- Rhythm pattern defaults to "Basic Rock"
+
+### 2. Microphone Access and Listening
+#### Start Listening
+- User clicks "Start Listening" button
+- Application requests microphone permissions
+- Audio context is created
+- Real-time audio processing begins
+- Visualization elements activate // create visualization elements in one dot
+
+
+#### Audio Analysis Process
+- Continuous audio stream is processed
+- Frequency and time domain data analyzed
+- Beat detection algorithm runs in real-time
+- Energy thresholds determine beat occurrence
+- Visualization updates dynamically
+
+### 3. BPM and Rhythm Detection
+- Initial BPM estimation starts
+- Beat intervals are tracked and analyzed
+- Rhythm stability calculated
+- Detected BPM displayed in real-time
+- Stability indicator shows rhythm consistency
+
+### 3.1 BPM and Rhythm Autoplay and Autostop
+
+#### Rhythm Stability Conditions
+- Rhythm considered stable after:
+  - Minimum 4-6 consistent beat detections
+  - BPM variation within ±10% of initial estimate
+  - Consistent energy levels across beat intervals
+
+#### Autoplay Mechanism
+- Stability Threshold Reached Triggers:
+  - "Play Rhythm" button becomes clickable
+  - Visual indicator of rhythm readiness
+  - Automatic suggestion to start rhythm playback
+
+#### Autoplay Activation
+- Conditions for Automatic Playback:
+  - Rhythm stability confirmed
+  - User preference for auto-start enabled
+  - Microphone input consistently detected
+  - No significant audio interruptions
+
+#### Rhythm Playback Features
+- Automatic pattern selection based on detected rhythm
+- Seamless transition between detected and selected patterns
+- Real-time BPM synchronization
+- Visualization of current beat position
+
+#### Autostop Mechanisms
+- Stop Conditions:
+  1. Prolonged Audio Silence
+     - No beat detected for 2-3 seconds
+     - Microphone input drops below energy threshold
+  
+  2. Rhythm Instability
+     - Sudden BPM fluctuations
+     - Inconsistent beat intervals
+     - Significant changes in audio characteristics
+  
+  3. User Interaction
+     - Manually stopping playback
+     - Changing rhythm pattern
+     - Pausing beat detection
+
+#### Smart Recovery
+- After Autostop:
+  - Retain last stable rhythm parameters
+  - Offer quick restart option
+  - Provide visual feedback on stop reason
+  - Minimal disruption to user workflow
+
+#### Performance Optimizations
+- Lightweight autostop algorithm
+- Minimal CPU and memory overhead
+- Responsive detection and playback control
+- Graceful error handling and recovery
+
+### 4. Rhythm Pattern Selection
+#### Predefined Patterns
+- User can select from:
+  - Basic Rock
+  - Military March
+  - Electronic
+  - Reggae
+  - Funk
+- Each pattern has unique beat characteristics
+
+#### Custom Pattern Creation
+- Interactive 16-step grid for each instrument
+- Click grid buttons to add/remove beats
+- Kick, Snare, and Hi-Hat tracks independently editable
+- Instant visual and audio feedback
+
+#### Random Pattern Generation
+- Generates musically coherent random rhythm
+- Maintains basic musical structure
+- Provides inspiration for new rhythms
+
+### 5. BPM Manipulation
+#### Manual Adjustment
+- Increase/Decrease BPM buttons
+- Fine-tune detected rhythm
+- ±10 BPM per click
+- Immediate tempo change
+
+#### Tap Tempo
+- Tap "Tap Tempo" button to set BPM
+- Multiple taps create more accurate estimation
+- Useful for matching external music or live performance
+
+### 6. Rhythm Playback
+- "Play Rhythm" button triggers audio playback
+- Selected pattern played through browser's audio context
+- Visualizations sync with rhythm
+- Can be stopped/started at any time
+
+### 7. Continuous Interaction
+- Real-time updates
+- No page reload required
+- Smooth, responsive user experience
+- Accessible beat detection and rhythm creation
+
+### Error Handling and Limitations
+- Microphone access can be denied
+- Works best with clear, percussive audio
+- Recommended for practice, not professional recording
+- Browser and device compatibility may vary
+
+### Performance Considerations
+- Low CPU and memory footprint
+- Efficient Web Audio API usage
+- Responsive design
+- Works on most modern browsers
+
+## Technology Stack
+- Web Audio API
+- JavaScript
+- Real-time Audio Processing
+- Beat Detection Algorithms
+
+## Version
+Current version: 1.2.0
